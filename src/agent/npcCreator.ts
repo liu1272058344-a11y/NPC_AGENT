@@ -5,6 +5,17 @@ export interface CreatorReply { status: 'needs_clarification' | 'complete'; ques
 export interface AgentConfig { endpoint: string; model: string; provider: 'backend' | 'deepseek' | 'openai'; apiKey: string }
 let config: AgentConfig = { endpoint: 'http://localhost:8787/api/npc', model: 'deepseek-chat', provider: 'backend', apiKey: '' }
 export const setAgentConfig = (next: Partial<AgentConfig>) => { config = { ...config, ...next } }
+const parseCreatorJson = (value: string): CreatorReply => {
+  const cleaned = value.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim()
+  try { return JSON.parse(cleaned) as CreatorReply } catch {
+    const start = cleaned.indexOf('{')
+    const end = cleaned.lastIndexOf('}')
+    if (start >= 0 && end > start) {
+      try { return JSON.parse(cleaned.slice(start, end + 1)) as CreatorReply } catch { /* handled below */ }
+    }
+    throw new Error('模型返回的内容不是有效 JSON，请点击重试。')
+  }
+}
 
 export async function createNPC(messages: AgentMessage[]): Promise<CreatorReply> {
   const direct = config.provider !== 'backend'
@@ -15,6 +26,6 @@ export async function createNPC(messages: AgentMessage[]): Promise<CreatorReply>
   let body: any
   try { body = JSON.parse(raw) } catch { throw new Error(raw || `Backend returned an empty response (${response.status})`) }
   if (!response.ok) throw new Error(body.error || 'NPC Creator Agent request failed')
-  if (direct) { const text = body.choices?.[0]?.message?.content || '{}'; const cleaned = String(text).replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim(); return JSON.parse(cleaned) as CreatorReply }
+  if (direct) { const text = body.choices?.[0]?.message?.content || '{}'; return parseCreatorJson(String(text)) }
   return body as CreatorReply
 }
