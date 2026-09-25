@@ -20,7 +20,7 @@ const parseCreatorJson = (value: string): CreatorReply => {
 export async function createNPC(messages: AgentMessage[]): Promise<CreatorReply> {
   const direct = config.provider !== 'backend'
   const endpoint = direct ? `${config.endpoint.replace(/\/$/, '')}/chat/completions` : config.endpoint
-  const request = direct ? { model: config.model, messages: [{ role: 'system', content: '你是 NPC Creator Agent。通过多轮对话澄清游戏类型、风格、NPC用途、玩家关系、核心目标和角色冲突。信息不足时返回 JSON：{"status":"needs_clarification","question":"","options":[]}；完整时返回 JSON：{"status":"complete","npc":{}}。只返回 JSON。' }, ...messages], response_format: { type: 'json_object' }, stream: false } : { messages, model: config.model }
+  const request = direct ? { model: config.model, messages: [{ role: 'system', content: '你是 NPC Creator Agent。通过多轮对话澄清游戏类型、风格、NPC用途、玩家关系、核心目标和角色冲突。信息不足时返回 JSON：{"status":"needs_clarification","question":"","options":[]}；完整时返回 JSON：{"status":"complete","npc":{"name":"有辨识度的中文名","summary":"具体概述","background":"包含过去经历、当前处境和与玩家相遇原因的完整背景","personality":["至少3项"],"behaviorRules":["至少3条"]}}。不要使用未命名 NPC、空背景或套话。只返回 JSON。' }, ...messages], response_format: { type: 'json_object' }, stream: false } : { messages, model: config.model }
   const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json', ...(direct ? { Authorization: `Bearer ${config.apiKey}` } : {}) }, body: JSON.stringify(request) })
   const raw = await response.text()
   let body: any
