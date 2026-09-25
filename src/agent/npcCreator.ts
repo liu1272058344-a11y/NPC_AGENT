@@ -3,7 +3,7 @@ export interface AgentMessage { role: 'user' | 'assistant'; content: string }
 export interface CreatorReply { status: 'needs_clarification' | 'complete'; question?: string; options?: string[]; missingFields?: string[]; npc?: NPC }
 
 export interface AgentConfig { endpoint: string; model: string; provider: 'backend' | 'deepseek' | 'openai'; apiKey: string }
-let config: AgentConfig = { endpoint: 'http://localhost:8787/api/npc', model: 'deepseek-chat', provider: 'backend', apiKey: '' }
+let config: AgentConfig = { endpoint: 'https://api.deepseek.com', model: 'deepseek-chat', provider: 'deepseek', apiKey: '' }
 export const setAgentConfig = (next: Partial<AgentConfig>) => { config = { ...config, ...next } }
 const parseCreatorJson = (value: string): CreatorReply => {
   const cleaned = value.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim()
