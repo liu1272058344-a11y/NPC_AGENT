@@ -1,62 +1,39 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import './App.css'
+import { createNPC, setAgentConfig } from './agent/npcCreator'
+import type { AgentMessage } from './agent/npcCreator'
+import type { NPC } from './types/npc'
 
-const navItems = ['Overview', 'NPC Creation', 'Character Studio']
+const navItems = ['Overview', 'NPC Creation', 'Character Studio', 'API Settings']
+const navLabels: Record<string, string> = { Overview: '概览', 'NPC Creation': 'NPC 创建', 'Character Studio': '角色工作室', 'API Settings': 'API 设置' }
+const examplePrompt = '我想制作一个赛博朋克世界里的地下医生 NPC。他在黑市诊所为底层居民治疗义体故障，也会向玩家发布危险委托。他并不完全善良，只是讨厌企业把人当作零件。'
+const toList = (value: unknown, fallback: string[] = []) => Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : typeof value === 'string' && value.trim() ? [value] : fallback
+const normalizeNPC = (value: NPC): NPC => ({ ...value, name: value.name || '未命名 NPC', role: value.role || '未定义身份', world: value.world || '未定义世界', function: value.function || '剧情 NPC', summary: value.summary || '一个等待继续完善的游戏 NPC。', background: value.background || '', goal: value.goal || '完成自己的使命。', speechStyle: value.speechStyle || '保持角色一致的自然表达。', personality: toList(value.personality, ['待定义']), behaviorRules: toList(value.behaviorRules, ['保持角色设定一致']), sourcePrompt: value.sourcePrompt || '' })
+const readSavedNPC = (): NPC | null => { try { const saved = localStorage.getItem('npc-forge-current-npc'); if (!saved) return null; return normalizeNPC(JSON.parse(saved) as NPC) } catch { localStorage.removeItem('npc-forge-current-npc'); return null } }
 
 function App() {
   const [active, setActive] = useState('Overview')
-  const [generated, setGenerated] = useState(false)
+  const [description, setDescription] = useState('')
+  const [npc, setNpc] = useState<NPC | null>(readSavedNPC)
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [error, setError] = useState('')
+  const [provider, setProvider] = useState<'backend' | 'deepseek' | 'openai'>(() => sessionStorage.getItem('npc-provider') as 'backend' | 'deepseek' | 'openai' || 'backend')
+  const [model, setModel] = useState(() => sessionStorage.getItem('npc-model') || 'deepseek-chat')
+  const [apiKey, setApiKey] = useState(() => sessionStorage.getItem('npc-api-key') || '')
+  const [endpoint, setEndpoint] = useState(() => { const stored = localStorage.getItem('npc-endpoint'); return !stored || stored === '/api/npc' ? 'http://localhost:8787/api/npc' : stored })
+  const [saved, setSaved] = useState(false)
+  const [messages, setMessages] = useState<AgentMessage[]>([])
+  const [questionOptions, setQuestionOptions] = useState<string[]>([])
 
-  return (
-    <div className="app-shell">
-      <aside className="sidebar">
-        <div className="brand">NPC FORGE</div>
-        <div className="product-label">AI WORKBENCH</div>
-        <nav className="nav-list" aria-label="Main navigation">
-          {navItems.map((item) => (
-            <button className={`nav-item ${active === item ? 'is-active' : ''}`} key={item} type="button" onClick={() => setActive(item)}>
-              {item}
-            </button>
-          ))}
-        </nav>
-        <div className="version">v0.1 MVP</div>
-      </aside>
-
-      <main className="main-area">
-        <header className="topbar">
-          <h1>{active === 'Overview' ? 'Landing Page' : active}</h1>
-          <span className="search-hint">⌘ K&nbsp;&nbsp; Search workspace</span>
-        </header>
-
-        <div className="content">
-          <section className="hero-card">
-            <div>
-              <h2>Forge characters that feel alive</h2>
-              <p>Prompt → Persona → Memory → Export</p>
-            </div>
-            <button className="primary-button" type="button" onClick={() => setGenerated(true)}>
-              {generated ? 'NPC READY' : 'Generate NPC'}
-            </button>
-          </section>
-
-          <section className="workspace panel">
-            <div className="panel-label">WORKSPACE</div>
-            <div className="workspace-card">
-              <div><strong>{generated ? 'Rook-07 is ready' : 'Create your first NPC'}</strong><span>{generated ? 'A starter character profile has been generated.' : 'Start with a role, motive, and visual anchor.'}</span></div>
-              <span className={`status-dot ${generated ? 'is-ready' : ''}`} aria-label={generated ? 'Ready' : 'Not started'} />
-            </div>
-            <div className="mvp-note">MVP preview · generation is currently simulated</div>
-          </section>
-
-          <div className="status-row">
-            <div className="status-chip primary">SYNCED</div>
-            <div className="status-chip">MEMORY 84%</div>
-            <div className="status-chip">GODOT READY</div>
-          </div>
-        </div>
-      </main>
-    </div>
-  )
+  useEffect(() => { setAgentConfig({ model, endpoint, provider, apiKey }) }, [model, endpoint, provider, apiKey])
+  const saveSettings = () => { sessionStorage.setItem('npc-provider', provider); sessionStorage.setItem('npc-model', model); sessionStorage.setItem('npc-api-key', apiKey); localStorage.setItem('npc-endpoint', endpoint); setSaved(true); setTimeout(() => setSaved(false), 1800) }
+  const generate = async (answer?: string) => { const content = (answer || description).trim(); if (!content) return; if (messages.length === 0) { setNpc(null); localStorage.removeItem('npc-forge-current-npc') } setDescription(content); setIsGenerating(true); setError(''); const nextMessages = [...messages, { role: 'user' as const, content }]; try { const result = await createNPC(nextMessages); setMessages([...nextMessages, ...(result.question ? [{ role: 'assistant' as const, content: result.question }] : [])]); setQuestionOptions(result.options || []); if (result.status === 'complete' && result.npc) { const normalized = normalizeNPC(result.npc); setNpc(normalized); localStorage.setItem('npc-forge-current-npc', JSON.stringify(normalized)); setDescription('') } else { setDescription('') } } catch (requestError) { setError(requestError instanceof Error ? requestError.message : '无法连接 NPC Creator Agent') } finally { setIsGenerating(false) } }
+  const profile = npc && <section className="panel result-panel"><div className="result-heading"><div><div className="panel-label">NPC 创建结果</div><h3>{npc.name}</h3><p>{npc.role} · {npc.world}</p></div><span className="status-chip primary">已保存</span></div><div className="npc-grid"><div className="full-field"><span className="field-label">概述</span><p>{npc.summary}</p></div><div><span className="field-label">游戏功能</span><strong>{npc.function}</strong></div><div><span className="field-label">核心目标</span><strong>{npc.goal}</strong></div><div><span className="field-label">性格</span><div className="tags">{npc.personality.map((trait) => <span key={trait}>{trait}</span>)}</div></div><div><span className="field-label">说话风格</span><strong>{npc.speechStyle}</strong></div><div className="full-field"><span className="field-label">背景</span><p>{npc.background}</p></div><div className="full-field"><span className="field-label">行为规则</span><ul className="rules">{npc.behaviorRules.map((rule) => <li key={rule}>{rule}</li>)}</ul></div></div></section>
+  const creation = <><section className="hero-card creation-hero"><div><h2>通过对话创建 NPC</h2><p>Agent 会判断信息完整度，并主动追问游戏方向、NPC 用途和角色冲突。</p></div></section><section className="panel creation-panel"><div className="panel-label">NPC 创建 Agent · 对话</div>{messages.length > 0 && <div className="conversation-log">{messages.map((message, index) => <div className={`chat-line ${message.role}`} key={`${message.role}-${index}`}><span>{message.role === 'user' ? '你' : 'Agent'}</span><p>{message.content}</p></div>)}</div>}{questionOptions.length > 0 && <div className="option-block"><span className="field-label">快速回答</span><div className="question-options">{questionOptions.map((option) => <button className="choice" key={option} type="button" disabled={isGenerating} onClick={() => generate(option)}>{option}</button>)}</div><p className="option-hint">没有合适的选项？请在下方输入框告诉我。</p></div>}<textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder={messages.length ? '也可以自由输入你的回答…' : '描述 NPC、游戏设定、角色用途和整体风格…'} aria-label="NPC 描述" /><div className="input-footer"><button className="example-button" type="button" onClick={() => setDescription(examplePrompt)}>使用示例</button><button className="primary-button" type="button" disabled={isGenerating || !description.trim()} onClick={() => generate()}>{isGenerating ? '思考中…' : messages.length ? '发送回答' : '开始创建 NPC'}</button></div>{error && <div className="error-box"><p className="error-message">{error}</p><button className="example-button" type="button" onClick={() => generate()}>重试</button></div>}</section>{profile}</>
+  const studio = npc ? <><section className="hero-card creation-hero"><div><h2>角色工作室</h2><p>查看 NPC 创建 Agent 生成的角色档案。</p></div></section>{profile}</> : <section className="panel empty-state"><h2>还没有 NPC 档案</h2><p>请先创建一个 NPC，生成的档案会自动显示在这里。</p><button className="primary-button" type="button" onClick={() => setActive('NPC Creation')}>前往 NPC 创建</button></section>
+  const settings = <section className="panel settings-panel"><div className="panel-label">模型连接</div><h2>API 设置</h2><p className="section-hint">测试用户可以选择直连并填写自己的 API Key。Key 只保存在当前浏览器会话，不会写入项目。</p><label>连接模式<select aria-label="连接模式" value={provider} onChange={(e) => { const next = e.target.value as typeof provider; setProvider(next); setModel(next === 'openai' ? 'gpt-5' : 'deepseek-chat'); setEndpoint(next === 'openai' ? 'https://api.openai.com/v1' : next === 'deepseek' ? 'https://api.deepseek.com' : 'http://localhost:8787/api/npc') }}><option value="backend">本地服务</option><option value="deepseek">直连 DeepSeek</option><option value="openai">直连 OpenAI</option></select></label><label>模型<input aria-label="模型" value={model} onChange={(e) => setModel(e.target.value)} placeholder={provider === 'openai' ? 'gpt-5' : 'deepseek-chat'} /></label><label>API 地址<input aria-label="API 地址" value={endpoint} onChange={(e) => setEndpoint(e.target.value)} placeholder={provider === 'openai' ? 'https://api.openai.com/v1' : provider === 'deepseek' ? 'https://api.deepseek.com' : 'http://localhost:8787/api/npc'} /></label>{provider !== 'backend' && <label>API Key<input aria-label="API Key" type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="sk-..." /></label>}<div className="settings-status"><span className="status-dot is-ready" />{provider === 'backend' ? '本地服务模式' : '浏览器直连模式 · 需要模型服务允许浏览器请求'}</div><button className="primary-button" type="button" onClick={saveSettings}>{saved ? '已保存' : '保存设置'}</button></section>
+  const home = <><section className="hero-card"><div><h2>打造有生命力的游戏角色</h2><p>自然语言 → NPC 创建 Agent → 结构化角色档案</p></div><button className="primary-button" type="button" onClick={() => setActive('NPC Creation')}>创建 NPC</button></section><section className="workspace panel"><div className="panel-label">工作区</div><div className="workspace-card"><div><strong>{npc ? `${npc.name} 已准备就绪` : '创建你的第一个 NPC'}</strong><span>{npc ? '档案已保存，可在角色工作室中查看。' : '从一段自然语言角色描述开始。'}</span></div><span className={`status-dot ${npc ? 'is-ready' : ''}`} /></div></section></>
+  const page = active === 'NPC Creation' ? creation : active === 'Character Studio' ? studio : active === 'API Settings' ? settings : home
+  return <div className="app-shell"><aside className="sidebar"><div className="brand">NPC FORGE</div><div className="product-label">AI 工作台</div><nav className="nav-list" aria-label="主导航">{navItems.map((item) => <button className={`nav-item ${active === item ? 'is-active' : ''}`} key={item} type="button" onClick={() => setActive(item)}>{navLabels[item]}</button>)}</nav><div className="version">v0.1 MVP</div></aside><main className="main-area"><header className="topbar"><h1>{navLabels[active]}</h1><span className="search-hint">AI NPC 创建 Agent</span></header><div className="content">{page}</div></main></div>
 }
-
 export default App

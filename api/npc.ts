@@ -1,0 +1,10 @@
+const schema = { type: 'object', properties: { worldOptions: { type: 'array', items: { type: 'string' } }, roleOptions: { type: 'array', items: { type: 'string' } }, functionOptions: { type: 'array', items: { type: 'string' } }, personalityOptions: { type: 'array', items: { type: 'string' } } }, required: ['worldOptions', 'roleOptions', 'functionOptions', 'personalityOptions'], additionalProperties: false }
+export default async function handler(req: any, res: any) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' })
+  if (!process.env.OPENAI_API_KEY) return res.status(503).json({ error: 'OPENAI_API_KEY is not configured' })
+  const { action, description, draft, model } = req.body || {}
+  const prompt = action === 'analyze' ? `拆解用户的NPC需求，给出每个字段3个可选项。用户描述：${description}` : `根据用户描述和已选择字段，输出完整NPC JSON。用户描述：${description}；选择：${JSON.stringify(draft)}`
+  const response = await fetch('https://api.openai.com/v1/responses', { method: 'POST', headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ model: model || process.env.OPENAI_MODEL || 'gpt-5', input: [{ role: 'system', content: '你是 NPC Creator Agent，只输出合法 JSON，不要解释。' }, { role: 'user', content: prompt }], text: { format: { type: 'json_schema', name: action === 'analyze' ? 'npc_draft' : 'npc_profile', strict: true, schema: action === 'analyze' ? schema : { type: 'object', properties: { id: { type: 'string' }, name: { type: 'string' }, role: { type: 'string' }, world: { type: 'string' }, function: { type: 'string' }, personality: { type: 'array', items: { type: 'string' } }, summary: { type: 'string' }, goal: { type: 'string' }, speechStyle: { type: 'string' }, background: { type: 'string' }, sourcePrompt: { type: 'string' } }, required: ['id', 'name', 'role', 'world', 'function', 'personality', 'summary', 'goal', 'speechStyle', 'background', 'sourcePrompt'], additionalProperties: false } } } }) })
+  if (!response.ok) return res.status(502).json({ error: 'OpenAI request failed' })
+  const body = await response.json(); return res.status(200).json(JSON.parse(body.output_text))
+}
