@@ -1,5 +1,12 @@
-const schema = { type: 'object', properties: { worldOptions: { type: 'array', items: { type: 'string' } }, roleOptions: { type: 'array', items: { type: 'string' } }, functionOptions: { type: 'array', items: { type: 'string' } }, personalityOptions: { type: 'array', items: { type: 'string' } } }, required: ['worldOptions', 'roleOptions', 'functionOptions', 'personalityOptions'], additionalProperties: false }
-const parseJsonOutput = (value: unknown) => { const text = String(value || '').replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim(); if (!text) throw new Error('模型没有返回内容，请点击重试。'); try { return JSON.parse(text) } catch { const start = text.indexOf('{'); const end = text.lastIndexOf('}'); if (start >= 0 && end > start) return JSON.parse(text.slice(start, end + 1)); throw new Error('模型返回内容不完整，请点击重试。') } }
+export interface ReviewResult { approved: boolean; issues: string[]; suggestions: string[]; score?: number }
+export const normalizeReviewResult = (value: Partial<ReviewResult> | null | undefined): ReviewResult => {
+  const source = value && typeof value === 'object' ? value : {}
+  const strings = (entry: unknown) => Array.isArray(entry) ? entry.map(String).filter(Boolean) : entry == null ? [] : [String(entry)]
+  const score = typeof source.score === 'number' && Number.isFinite(source.score) ? source.score : undefined
+  return { approved: source.approved === true, issues: strings(source.issues), suggestions: strings(source.suggestions), ...(score === undefined ? {} : { score }) }
+}
+export const parseJsonOutput = (value: unknown): unknown => { const text = String(value ?? '').replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim(); if (!text) throw new Error('模型没有返回内容，请点击重试。'); try { return JSON.parse(text) } catch { const start = text.indexOf('{'); if (start < 0) throw new Error('模型返回内容不完整，请点击重试。'); let depth = 0; let quoted = false; let escaped = false; for (let index = start; index < text.length; index += 1) { const char = text[index]; if (quoted) { if (escaped) escaped = false; else if (char === '\\') escaped = true; else if (char === '"') quoted = false } else if (char === '"') quoted = true; else if (char === '{') depth += 1; else if (char === '}') { depth -= 1; if (depth === 0) { try { return JSON.parse(text.slice(start, index + 1)) } catch { break } } } } const candidate = text.slice(start).replace(/,\s*$/, ''); for (const suffix of ['}', ']}', '}}', ']}']) { try { return JSON.parse(candidate + suffix) } catch { /* truncated output */ } } throw new Error('模型返回内容不完整，请点击重试。') } }
+export const parseReviewResult = (value: string): ReviewResult => normalizeReviewResult(parseJsonOutput(value) as Partial<ReviewResult>)
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' })
   if (!process.env.OPENAI_API_KEY) return res.status(503).json({ error: 'OPENAI_API_KEY is not configured' })
