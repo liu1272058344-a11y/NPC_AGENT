@@ -8,6 +8,7 @@
 - Added a browser-side public response filter that keeps only the supported creation statuses, world/NPC fields, and clarification fields. Reviewer scores, issues, suggestions, and other unknown fields are discarded before React state receives the result.
 - Added deterministic request-shape and filtering tests using a fixture that intentionally contains reviewer metadata.
 - Added phase-specific completeness checks so partial `world_ready` or `complete` payloads become controlled retry errors instead of being filled with UI defaults and rendered as finished output.
+- Trimmed all public string arrays before filtering, preventing whitespace-only personality or behavior entries from passing completion validation.
 
 ## Verification
 

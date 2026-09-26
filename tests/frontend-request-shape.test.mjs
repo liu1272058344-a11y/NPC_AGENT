@@ -57,6 +57,11 @@ test('frontend rejects partial finalized responses but preserves clarification r
     () => agent.sanitizeCreatorReply({ status: 'complete', phase: 'npc', npc: { name: '不完整角色' } }),
     /NPC生成结果不完整/
   )
+  const whitespaceNpc = { ...fixture.npc, personality: [' ', '\t'], behaviorRules: ['  '] }
+  assert.throws(
+    () => agent.sanitizeCreatorReply({ status: 'complete', phase: 'npc', npc: whitespaceNpc }),
+    /NPC生成结果不完整/
+  )
   assert.deepEqual(
     agent.sanitizeCreatorReply({ status: 'needs_clarification', phase: 'world', question: '游戏类型是什么？', options: ['末日废土'] }),
     { status: 'needs_clarification', phase: 'world', question: '游戏类型是什么？', options: ['末日废土'] }

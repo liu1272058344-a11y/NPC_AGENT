@@ -45,7 +45,7 @@ const parseCreatorJson = (value: string): CreatorReply => parseJsonCandidate(val
 const worldFields: Array<keyof WorldProfile> = ['name', 'genre', 'era', 'atmosphere', 'coreRule', 'centralConflict', 'summary']
 const npcFields: Array<keyof NPC> = ['id', 'name', 'role', 'world', 'function', 'summary', 'goal', 'speechStyle', 'background', 'behaviorRules', 'sourcePrompt', 'personality']
 const npcStringFields: Array<keyof NPC> = ['id', 'name', 'role', 'world', 'function', 'summary', 'goal', 'speechStyle', 'background', 'sourcePrompt']
-const publicStringList = (value: unknown): string[] | undefined => Array.isArray(value) ? value.map(String).filter(Boolean) : undefined
+const publicStringList = (value: unknown): string[] | undefined => Array.isArray(value) ? value.map((item) => String(item).trim()).filter(Boolean) : undefined
 const hasText = (value: unknown): value is string => typeof value === 'string' && value.trim().length > 0
 
 /**
