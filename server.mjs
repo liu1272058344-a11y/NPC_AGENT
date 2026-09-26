@@ -12,6 +12,7 @@ const reviewSchema = { type: 'object', properties: { approved: { type: 'boolean'
 const send = (res, status, body) => res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Access-Control-Allow-Origin': 'http://localhost:5173', 'Access-Control-Allow-Headers': 'Content-Type' }).end(JSON.stringify(body))
 const prompt = '你是 NPC Creator Agent，必须执行两阶段工作流。第一阶段“世界观构思”：先检查 genre 类型、era 时代背景、atmosphere 整体氛围、coreRule 核心规则、centralConflict 主要冲突。信息不足时每轮只问一个最重要问题，返回 status=needs_clarification、phase=world、question 和 3-5 个 options；信息充分后返回 status=world_ready、phase=world 和 world，world 必须包含 name、genre、era、atmosphere、coreRule、centralConflict、summary。此时禁止生成 npc。只有用户明确说确认世界观或进入 NPC 设计阶段，才进入第二阶段。第二阶段检查 function NPC用途、relationship 玩家关系、goal 核心目标、conflict 角色冲突；不足时返回 status=needs_clarification、phase=npc；充分后返回 status=complete、phase=npc 和 npc。NPC 必须根据世界观自动命名，background 包含过去经历、当前处境和与玩家相遇原因，personality 与 behaviorRules 各至少3项。不得返回空字段、待定、Markdown 或额外文字，只返回合法 JSON。'
 const worldReviewPrompt = '你是后台世界观质量评审 Agent。只输出合法 JSON，不要解释。检查世界观的完整性、内部一致性、独特性、可用于游戏的核心冲突，以及与用户原始意图的一致性。若有任何一项不足，approved 必须为 false，并在 issues 和 suggestions 中给出具体、可执行的修改意见。通过时 approved 为 true，issues 和 suggestions 使用空数组。输出格式：{"approved":true,"issues":[],"suggestions":[],"score":0}。'
+const npcReviewPrompt = '你是后台 NPC 质量评审 Agent。只输出合法 JSON，不要解释。结合已确认世界观和用户对话，检查 NPC 的身份与自动命名、具体背景（过去经历、当前处境、与玩家相遇原因）、游戏功能、核心目标、角色冲突、性格、说话风格、可执行行为规则、玩家关系、世界观一致性，以及对用户意图的贴合度。任何一项不足或与世界观规则冲突，approved 必须为 false，并在 issues 和 suggestions 中给出具体、可执行的修改意见；通过时 approved 为 true，issues 和 suggestions 使用空数组。输出格式：{"approved":true,"issues":[],"suggestions":[],"score":0}。'
 
 export const parseJsonOutput = (text) => { const cleaned = String(text ?? '').replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim(); if (!cleaned) throw new Error('Model output was empty'); try { return JSON.parse(cleaned) } catch { const start = cleaned.indexOf('{'); if (start < 0) throw new Error('Model output was not valid JSON'); let depth = 0; let quoted = false; let escaped = false; for (let index = start; index < cleaned.length; index += 1) { const char = cleaned[index]; if (quoted) { if (escaped) escaped = false; else if (char === '\\') escaped = true; else if (char === '"') quoted = false } else if (char === '"') quoted = true; else if (char === '{') depth += 1; else if (char === '}') { depth -= 1; if (depth === 0) { try { return JSON.parse(cleaned.slice(start, index + 1)) } catch { break } } } } const candidate = cleaned.slice(start).replace(/,\s*$/, ''); for (const suffix of ['}', ']}', '}}']) { try { return JSON.parse(candidate + suffix) } catch { /* bounded repair */ } } throw new Error('Model output was not valid JSON') } }
 export const normalizeReviewResult = (value = {}) => { const source = value && typeof value === 'object' ? value : {}; const strings = (entry) => Array.isArray(entry) ? entry.map(String).filter(Boolean) : entry == null ? [] : [String(entry)]; const score = Number.isFinite(source.score) ? Number(source.score) : undefined; return { approved: source.approved === true, issues: strings(source.issues), suggestions: strings(source.suggestions), ...(score === undefined ? {} : { score }) } }
@@ -19,22 +20,29 @@ export const parseReviewResult = (text) => normalizeReviewResult(parseJsonOutput
 export const publicReply = (value) => { const allowed = new Set(['needs_clarification', 'world_ready', 'complete']); if (!allowed.has(value?.status)) throw new Error('Model returned an unsupported public status'); const reply = { status: value.status }; for (const key of ['phase', 'question', 'options', 'missingFields', 'world', 'npc']) if (value[key] !== undefined) reply[key] = value[key]; return reply }
 
 const nonEmpty = (value) => typeof value === 'string' && value.trim().length > 0
-const validateWorldReply = (value) => { if (value?.status === 'needs_clarification') return publicReply(value); if (value?.status !== 'world_ready' || value?.phase !== 'world' || !value.world || typeof value.world !== 'object') throw new Error('World generation returned an invalid phase result'); const fields = ['name', 'genre', 'era', 'atmosphere', 'coreRule', 'centralConflict', 'summary']; if (fields.some((field) => !nonEmpty(value.world[field]))) throw new Error('World generation returned an incomplete world'); return { status: 'world_ready', phase: 'world', world: Object.fromEntries(fields.map((field) => [field, String(value.world[field]).trim()])) } }
+const worldFields = ['name', 'genre', 'era', 'atmosphere', 'coreRule', 'centralConflict', 'summary']
+const npcFields = ['id', 'name', 'role', 'world', 'function', 'summary', 'background', 'goal', 'speechStyle', 'sourcePrompt']
+const validateWorldContext = (world) => { if (!world || typeof world !== 'object' || worldFields.some((field) => !nonEmpty(world[field]))) throw Object.assign(new Error('NPC generation requires a confirmed world context.'), { statusCode: 400 }); return Object.fromEntries(worldFields.map((field) => [field, String(world[field]).trim()])) }
+const validateWorldReply = (value) => { if (value?.status === 'needs_clarification') return publicReply(value); if (value?.status !== 'world_ready' || value?.phase !== 'world' || !value.world || typeof value.world !== 'object') throw new Error('World generation returned an invalid phase result'); if (worldFields.some((field) => !nonEmpty(value.world[field]))) throw new Error('World generation returned an incomplete world'); return { status: 'world_ready', phase: 'world', world: Object.fromEntries(worldFields.map((field) => [field, String(value.world[field]).trim()])) } }
+const validateNpcReply = (value, world) => { if (value?.status === 'needs_clarification') return publicReply({ ...value, phase: 'npc' }); if (value?.status !== 'complete' || value?.phase !== 'npc' || !value.npc || typeof value.npc !== 'object') throw new Error('NPC generation returned an invalid phase result'); const source = value.npc; if (npcFields.some((field) => !nonEmpty(source[field]))) throw new Error('NPC generation returned an incomplete NPC'); if (/未命名|未定义|unnamed/i.test(String(source.name))) throw new Error('NPC generation returned an unnamed NPC'); const personality = Array.isArray(source.personality) ? source.personality.map(String).map((item) => item.trim()).filter(Boolean) : []; const behaviorRules = Array.isArray(source.behaviorRules) ? source.behaviorRules.map(String).map((item) => item.trim()).filter(Boolean) : []; if (!personality.length || !behaviorRules.length) throw new Error('NPC generation returned incomplete personality or behavior rules'); return { status: 'complete', phase: 'npc', npc: Object.fromEntries([...npcFields, 'personality', 'behaviorRules'].map((field) => [field, field === 'personality' ? personality : field === 'behaviorRules' ? behaviorRules : String(source[field]).trim()])) } }
 const reviewFeedback = (review) => [...review.issues, ...review.suggestions].filter(Boolean).join('；') || '请补充缺失信息，并让世界观更具体、更适合玩法。'
 const revisionMessage = (draft, review) => `这是上一版世界观草案（仅供内部修订）：${JSON.stringify(draft)}。后台质量评审指出：${reviewFeedback(review)}。请根据这些意见修订世界观，保留用户原始意图，只返回完整的 status=world_ready、phase=world 和 world JSON；不要生成 NPC，不要解释。`
+const npcRevisionMessage = (draft, review, world) => `这是上一版 NPC 草案（仅供内部修订）：${JSON.stringify(draft)}。已确认世界观约束：${JSON.stringify(world)}。后台质量评审指出：${reviewFeedback(review)}。请根据这些意见修订 NPC，保留用户原始意图，严格遵守已确认世界观，不要生成世界观，不要解释，只返回完整的 status=complete、phase=npc 和 npc JSON。`
 const providerOutput = (provider, payload) => provider === 'deepseek' ? payload.choices?.[0]?.message?.content : payload.output_text || payload.output?.flatMap((item) => item.content || []).find((item) => item.type === 'output_text')?.text
 
-const reviewMessages = (messages, draft) => [
+const reviewMessages = (messages, draft, phase = 'world', world) => [
   ...(Array.isArray(messages) ? messages : []),
   {
     role: 'user',
-    content: `请评审下面的世界观草案。用户原始对话保留在前面的消息中。只输出评审 JSON。\n世界观草案：${JSON.stringify(draft)}`
+    content: phase === 'npc'
+      ? `请评审下面的 NPC 草案。用户原始对话保留在前面的消息中。只输出评审 JSON。\n已确认世界观：${JSON.stringify(world)}\nNPC 草案：${JSON.stringify(draft)}`
+      : `请评审下面的世界观草案。用户原始对话保留在前面的消息中。只输出评审 JSON。\n世界观草案：${JSON.stringify(draft)}`
   }
 ]
 
-export const requestModel = async ({ provider, key, model, messages, system, schema, kind, draft }) => {
+export const requestModel = async ({ provider, key, model, messages, system, schema, kind, draft, phase, world }) => {
   const isDeepSeek = provider === 'deepseek'
-  const inputMessages = kind === 'review' ? reviewMessages(messages, draft) : (Array.isArray(messages) ? messages : [])
+  const inputMessages = kind === 'review' ? reviewMessages(messages, draft, phase, world) : (Array.isArray(messages) ? messages : [])
   let lastError
   for (let attempt = 0; attempt < (isDeepSeek ? 3 : 1); attempt += 1) {
     const retrySystem = attempt === 0 ? system : `${system} 再检查一次：只返回一个完整 JSON 对象，不要 Markdown、解释或空白。`
@@ -61,18 +69,20 @@ export const requestModel = async ({ provider, key, model, messages, system, sch
 }
 
 /** Internal generation -> review -> bounded revision loop. Review details never leave this function. */
-export const runReviewedGeneration = async ({ phase, messages, model, provider, key, request = requestModel }) => {
-  if (phase !== 'world') throw new Error(`Unsupported review phase: ${phase}`)
-  const originalMessages = Array.isArray(messages) ? messages : []; let generationMessages = [...originalMessages]
+export const runReviewedGeneration = async ({ phase, messages, world, model, provider, key, request = requestModel }) => {
+  if (phase !== 'world' && phase !== 'npc') throw new Error(`Unsupported review phase: ${phase}`)
+  const originalMessages = Array.isArray(messages) ? messages : []; const confirmedWorld = phase === 'npc' ? validateWorldContext(world) : undefined; let generationMessages = [...originalMessages]
   for (let revision = 0; revision <= MAX_REVISIONS; revision += 1) {
-    const generated = await request({ kind: 'generation', phase, model, provider, key, messages: generationMessages, system: prompt, schema: replySchema }); const draft = validateWorldReply(generated); if (draft.status === 'needs_clarification') return draft
-    const reviewValue = await request({ kind: 'review', phase, model, provider, key, messages: originalMessages, draft: draft.world, system: worldReviewPrompt, schema: reviewSchema }); const review = normalizeReviewResult(reviewValue); if (review.approved) return draft
-    if (revision >= MAX_REVISIONS) throw new Error('世界观草案未通过内部质量检查，请点击重试。')
-    generationMessages = [...originalMessages, { role: 'user', content: revisionMessage(draft.world, review) }]
+    const system = phase === 'npc' ? `${prompt} 已确认世界观如下，必须严格遵守：${JSON.stringify(confirmedWorld)}` : prompt
+    const schema = replySchema
+    const generated = await request({ kind: 'generation', phase, model, provider, key, messages: generationMessages, world: confirmedWorld, system, schema }); const draft = phase === 'npc' ? validateNpcReply(generated, confirmedWorld) : validateWorldReply(generated); if (draft.status === 'needs_clarification') return draft
+    const reviewValue = await request({ kind: 'review', phase, model, provider, key, messages: originalMessages, draft: phase === 'npc' ? draft.npc : draft.world, world: confirmedWorld, system: phase === 'npc' ? npcReviewPrompt : worldReviewPrompt, schema: reviewSchema }); const review = normalizeReviewResult(reviewValue); if (review.approved) return draft
+    if (revision >= MAX_REVISIONS) throw new Error(`${phase === 'npc' ? 'NPC' : '世界观'}草案未通过内部质量检查，请点击重试。`)
+    generationMessages = [...originalMessages, { role: 'user', content: phase === 'npc' ? npcRevisionMessage(draft.npc, review, confirmedWorld) : revisionMessage(draft.world, review) }]
   }
-  throw new Error('世界观草案未通过内部质量检查，请点击重试。')
+  throw new Error(`${phase === 'npc' ? 'NPC' : '世界观'}草案未通过内部质量检查，请点击重试。`)
 }
 
-export const handleRequest = async ({ messages, model, provider = (process.env.AI_PROVIDER || 'openai').toLowerCase(), key = provider === 'deepseek' ? process.env.DEEPSEEK_API_KEY : process.env.OPENAI_API_KEY }) => { if (!Array.isArray(messages) || !messages.length) throw Object.assign(new Error('messages is required'), { statusCode: 400 }); if (!key) throw Object.assign(new Error(`${provider === 'deepseek' ? 'DEEPSEEK_API_KEY' : 'OPENAI_API_KEY'} is missing in .env.local`), { statusCode: 503 }); const selectedModel = provider === 'deepseek' ? (typeof model === 'string' && model.startsWith('deepseek') ? model : process.env.DEEPSEEK_MODEL || 'deepseek-chat') : model || process.env.OPENAI_MODEL || 'gpt-5'; return runReviewedGeneration({ phase: 'world', messages, model: selectedModel, provider, key }) }
+export const handleRequest = async ({ messages, model, phase = 'world', world, provider = (process.env.AI_PROVIDER || 'openai').toLowerCase(), key = provider === 'deepseek' ? process.env.DEEPSEEK_API_KEY : process.env.OPENAI_API_KEY }) => { if (!Array.isArray(messages) || !messages.length) throw Object.assign(new Error('messages is required'), { statusCode: 400 }); if (!key) throw Object.assign(new Error(`${provider === 'deepseek' ? 'DEEPSEEK_API_KEY' : 'OPENAI_API_KEY'} is missing in .env.local`), { statusCode: 503 }); const selectedModel = provider === 'deepseek' ? (typeof model === 'string' && model.startsWith('deepseek') ? model : process.env.DEEPSEEK_MODEL || 'deepseek-chat') : model || process.env.OPENAI_MODEL || 'gpt-5'; return runReviewedGeneration({ phase, world, messages, model: selectedModel, provider, key }) }
 export const startServer = (port = 8787) => createServer(async (req, res) => { if (req.method === 'OPTIONS') return send(res, 204, {}); if (req.method !== 'POST' || req.url !== '/api/npc') return send(res, 404, { error: 'Not found' }); let raw = ''; for await (const chunk of req) raw += chunk; try { const result = await handleRequest(JSON.parse(raw)); return send(res, 200, publicReply(result)) } catch (error) { return send(res, error?.statusCode || 500, { error: error instanceof Error ? error.message : 'Unexpected server error' }) } }).listen(port, () => console.log(`NPC Creator API listening at http://localhost:${port}`))
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) startServer()
