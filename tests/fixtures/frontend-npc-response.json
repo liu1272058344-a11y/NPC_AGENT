@@ -1,0 +1,20 @@
+{
+  "status": "complete",
+  "phase": "npc",
+  "npc": {
+    "id": "npc-field-medic",
+    "name": "苏砾",
+    "role": "药房前的急救员",
+    "world": "灰烬边城",
+    "function": "为玩家提供急救、线索和求药任务",
+    "personality": ["坚韧", "谨慎", "同理心强"],
+    "background": "灾变后她在移动诊所学会止血，后来守在药房前救治伤者；玩家带来濒死同伴后，她请求玩家寻找抗生素。",
+    "summary": "一名在配给制度夹缝中救人的急救员。",
+    "goal": "保护病患并揭露被隐瞒的药品短缺。",
+    "speechStyle": "短句、谨慎，先确认风险再提出请求。",
+    "behaviorRules": ["先救命再谈报酬", "不浪费配给药物", "发现欺骗会终止合作"],
+    "sourcePrompt": "末日废土药房前的急救员",
+    "review": {"approved": true, "score": 9, "issues": [], "suggestions": []}
+  },
+  "review": {"approved": true, "score": 9, "issues": [], "suggestions": []}
+}

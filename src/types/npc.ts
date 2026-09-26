@@ -33,3 +33,11 @@ export interface NPCDraft {
   selectedFunction?: string
   selectedPersonality?: string[]
 }
+
+/** Internal quality review contract. Never send this object to the frontend. */
+export interface ReviewResult {
+  approved: boolean
+  issues: string[]
+  suggestions: string[]
+  score?: number
+}
