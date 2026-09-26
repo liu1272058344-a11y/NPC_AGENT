@@ -13,6 +13,16 @@ export interface NPC {
   sourcePrompt: string
 }
 
+export interface WorldProfile {
+  name: string
+  genre: string
+  era: string
+  atmosphere: string
+  coreRule: string
+  centralConflict: string
+  summary: string
+}
+
 export interface NPCDraft {
   worldOptions: string[]
   roleOptions: string[]
