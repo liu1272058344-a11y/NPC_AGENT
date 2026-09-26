@@ -9,12 +9,15 @@
 - Added deterministic request-shape and filtering tests using a fixture that intentionally contains reviewer metadata.
 - Added phase-specific completeness checks so partial `world_ready` or `complete` payloads become controlled retry errors instead of being filled with UI defaults and rendered as finished output.
 - Trimmed all public string arrays before filtering, preventing whitespace-only personality or behavior entries from passing completion validation.
+- Fixed the hosted `api/npc.ts` handler's duplicate `body` declaration so the serverless route can be transpiled and imported successfully.
 
 ## Verification
 
 - `npx tsc -b` passed.
 - `npx vite build` passed.
 - `node --test tests/frontend-request-shape.test.mjs` passed (3 tests, including partial-final-response rejection).
+- Full focused suite passed: 8 tests across frontend and backend review-loop fixtures.
+- Hosted route transpile/import smoke test passed for `api/npc.ts`.
 - `node --check server.mjs` passed.
 
 ## Notes
