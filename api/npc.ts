@@ -1,3 +1,4 @@
+const schema = { type: 'object', properties: { worldOptions: { type: 'array', items: { type: 'string' } }, roleOptions: { type: 'array', items: { type: 'string' } }, functionOptions: { type: 'array', items: { type: 'string' } }, personalityOptions: { type: 'array', items: { type: 'string' } } }, required: ['worldOptions', 'roleOptions', 'functionOptions', 'personalityOptions'], additionalProperties: false }
 export interface ReviewResult { approved: boolean; issues: string[]; suggestions: string[]; score?: number }
 export const normalizeReviewResult = (value: Partial<ReviewResult> | null | undefined): ReviewResult => {
   const source = value && typeof value === 'object' ? value : {}

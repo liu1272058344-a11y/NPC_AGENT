@@ -32,3 +32,8 @@ Fix commit: `b158f2f`.
 The API sanitizer now preserves `analyze` draft responses and wraps generated
 NPC profiles as `{ status: "complete", phase: "npc", npc }`, while still
 whitelisting fields so review metadata cannot leak.
+
+## Schema correction
+
+Restored the analysis response JSON schema in `api/npc.ts`, preventing a
+runtime `ReferenceError` when `action === "analyze"`.
