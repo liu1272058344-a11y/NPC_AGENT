@@ -7,12 +7,13 @@
 - Kept direct DeepSeek/OpenAI mode on its existing provider request shape and retained the local backend mode.
 - Added a browser-side public response filter that keeps only the supported creation statuses, world/NPC fields, and clarification fields. Reviewer scores, issues, suggestions, and other unknown fields are discarded before React state receives the result.
 - Added deterministic request-shape and filtering tests using a fixture that intentionally contains reviewer metadata.
+- Added phase-specific completeness checks so partial `world_ready` or `complete` payloads become controlled retry errors instead of being filled with UI defaults and rendered as finished output.
 
 ## Verification
 
 - `npx tsc -b` passed.
 - `npx vite build` passed.
-- `node --test tests/frontend-request-shape.test.mjs` passed (2 tests).
+- `node --test tests/frontend-request-shape.test.mjs` passed (3 tests, including partial-final-response rejection).
 - `node --check server.mjs` passed.
 
 ## Notes

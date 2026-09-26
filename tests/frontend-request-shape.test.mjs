@@ -47,3 +47,18 @@ test('frontend response filtering removes backend reviewer metadata', () => {
   assert.equal(result.npc && 'score' in result.npc, false)
   assert.deepEqual(result.npc?.behaviorRules, fixture.npc.behaviorRules)
 })
+
+test('frontend rejects partial finalized responses but preserves clarification replies', () => {
+  assert.throws(
+    () => agent.sanitizeCreatorReply({ status: 'world_ready', phase: 'world', world: { name: '不完整世界' } }),
+    /世界观生成结果不完整/
+  )
+  assert.throws(
+    () => agent.sanitizeCreatorReply({ status: 'complete', phase: 'npc', npc: { name: '不完整角色' } }),
+    /NPC生成结果不完整/
+  )
+  assert.deepEqual(
+    agent.sanitizeCreatorReply({ status: 'needs_clarification', phase: 'world', question: '游戏类型是什么？', options: ['末日废土'] }),
+    { status: 'needs_clarification', phase: 'world', question: '游戏类型是什么？', options: ['末日废土'] }
+  )
+})

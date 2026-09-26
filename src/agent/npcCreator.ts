@@ -44,7 +44,9 @@ const parseCreatorJson = (value: string): CreatorReply => parseJsonCandidate(val
 
 const worldFields: Array<keyof WorldProfile> = ['name', 'genre', 'era', 'atmosphere', 'coreRule', 'centralConflict', 'summary']
 const npcFields: Array<keyof NPC> = ['id', 'name', 'role', 'world', 'function', 'summary', 'goal', 'speechStyle', 'background', 'behaviorRules', 'sourcePrompt', 'personality']
+const npcStringFields: Array<keyof NPC> = ['id', 'name', 'role', 'world', 'function', 'summary', 'goal', 'speechStyle', 'background', 'sourcePrompt']
 const publicStringList = (value: unknown): string[] | undefined => Array.isArray(value) ? value.map(String).filter(Boolean) : undefined
+const hasText = (value: unknown): value is string => typeof value === 'string' && value.trim().length > 0
 
 /**
  * Keep the browser contract deliberately smaller than the backend response.
@@ -81,6 +83,14 @@ export const sanitizeCreatorReply = (value: unknown): CreatorReply => {
       } else if (typeof candidate[field] === 'string') npc[field] = candidate[field] as never
     }
     if (Object.keys(npc).length > 0) reply.npc = npc
+  }
+  if (status === 'world_ready') {
+    const candidate = reply.world
+    if (!candidate || worldFields.some((field) => !hasText(candidate[field]))) throw new Error('世界观生成结果不完整，请点击重试。')
+  }
+  if (status === 'complete') {
+    const candidate = reply.npc
+    if (!candidate || npcStringFields.some((field) => !hasText(candidate[field])) || !Array.isArray(candidate.personality) || candidate.personality.length === 0 || !Array.isArray(candidate.behaviorRules) || candidate.behaviorRules.length === 0) throw new Error('NPC生成结果不完整，请点击重试。')
   }
   return reply
 }
