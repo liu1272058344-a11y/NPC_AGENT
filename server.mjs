@@ -35,8 +35,17 @@ const reviewMessages = (messages, draft) => [
 export const requestModel = async ({ provider, key, model, messages, system, schema, kind, draft }) => {
   const isDeepSeek = provider === 'deepseek'
   const inputMessages = kind === 'review' ? reviewMessages(messages, draft) : (Array.isArray(messages) ? messages : [])
-  const response = isDeepSeek ? await fetch('https://api.deepseek.com/chat/completions', { method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ model, messages: [{ role: 'system', content: system }, ...inputMessages], response_format: { type: 'json_object' }, max_tokens: 2500, stream: false }) }) : await fetch('https://api.openai.com/v1/responses', { method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ model, store: false, input: [{ role: 'system', content: system }, ...inputMessages], text: { format: { type: 'json_schema', name: schema === reviewSchema ? 'npc_creator_review' : 'npc_creator_reply', strict: true, schema } } }) })
-  const raw = await response.text(); let payload; try { payload = JSON.parse(raw) } catch { throw new Error(`${provider} returned a non-JSON response`) }; if (!response.ok) throw new Error(payload.error?.message || `${provider} request failed`); const output = providerOutput(provider, payload); if (!output) throw new Error(`${provider} returned an empty response`); return parseJsonOutput(output)
+  let lastError
+  for (let attempt = 0; attempt < (isDeepSeek ? 3 : 1); attempt += 1) {
+    const retrySystem = attempt === 0 ? system : `${system} 再检查一次：只返回一个完整 JSON 对象，不要 Markdown、解释或空白。`
+    const response = isDeepSeek ? await fetch('https://api.deepseek.com/chat/completions', { method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ model, messages: [{ role: 'system', content: retrySystem }, ...inputMessages], response_format: { type: 'json_object' }, max_tokens: 2500, stream: false }) }) : await fetch('https://api.openai.com/v1/responses', { method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ model, store: false, input: [{ role: 'system', content: retrySystem }, ...inputMessages], text: { format: { type: 'json_schema', name: schema === reviewSchema ? 'npc_creator_review' : 'npc_creator_reply', strict: true, schema } } }) })
+    const raw = await response.text(); let payload
+    try { payload = JSON.parse(raw) } catch { lastError = new Error(`${provider} returned a non-JSON response`); continue }
+    if (!response.ok) throw new Error(payload.error?.message || `${provider} request failed`)
+    const output = providerOutput(provider, payload)
+    try { if (!output) throw new Error(`${provider} returned an empty response`); return parseJsonOutput(output) } catch (error) { lastError = error }
+  }
+  throw lastError || new Error(`${provider} request failed`)
 }
 
 /** Internal generation -> review -> bounded revision loop. Review details never leave this function. */
