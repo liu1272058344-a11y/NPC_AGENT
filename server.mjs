@@ -45,6 +45,18 @@ export const requestModel = async ({ provider, key, model, messages, system, sch
     const output = providerOutput(provider, payload)
     try { if (!output) throw new Error(`${provider} returned an empty response`); return parseJsonOutput(output) } catch (error) { lastError = error }
   }
+  if (isDeepSeek) {
+    const compactContext = inputMessages.map((message) => `${message.role === 'user' ? '用户' : 'Agent'}：${message.content}`).join('\n')
+    const compact = await fetch('https://api.deepseek.com/chat/completions', { method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ model, messages: [{ role: 'system', content: `${system} 当前对话如下，请继续完成当前步骤。只返回一个完整 JSON。` }, { role: 'user', content: compactContext }], response_format: { type: 'json_object' }, max_tokens: 2500, stream: false }) })
+    const compactRaw = await compact.text()
+    try {
+      const compactPayload = JSON.parse(compactRaw)
+      if (!compact.ok) throw new Error(compactPayload.error?.message || 'deepseek request failed')
+      const compactOutput = providerOutput(provider, compactPayload)
+      if (!compactOutput) throw new Error('deepseek returned an empty response')
+      return parseJsonOutput(compactOutput)
+    } catch (error) { lastError = error }
+  }
   throw lastError || new Error(`${provider} request failed`)
 }
 
