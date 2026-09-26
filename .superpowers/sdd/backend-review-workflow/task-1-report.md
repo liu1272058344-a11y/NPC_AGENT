@@ -19,3 +19,10 @@ Concerns: review generation and bounded revision loops remain intentionally
 unimplemented for Tasks 2 and 3. The repository had no test runner, so fixtures
 are documented assertions and the required compile/build checks are the
 automated verification available in this task.
+
+## Follow-up fix
+
+The direct `api/npc.ts` handler now applies the same public status whitelist as
+`server.mjs`, removing internal review fields before returning provider output.
+
+Fix commit: `b158f2f`.
