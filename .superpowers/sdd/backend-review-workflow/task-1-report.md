@@ -26,3 +26,9 @@ The direct `api/npc.ts` handler now applies the same public status whitelist as
 `server.mjs`, removing internal review fields before returning provider output.
 
 Fix commit: `b158f2f`.
+
+## Compatibility correction
+
+The API sanitizer now preserves `analyze` draft responses and wraps generated
+NPC profiles as `{ status: "complete", phase: "npc", npc }`, while still
+whitelisting fields so review metadata cannot leak.
