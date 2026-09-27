@@ -103,3 +103,21 @@ test('asset planner requires a complete confirmed world', () => {
   assert.equal(agent.hasConfirmedWorld(null), false)
   assert.equal(agent.hasConfirmedWorld({ ...world, centralConflict: ' ' }), false)
 })
+
+test('direct model retries once when the provider returns an empty message', async () => {
+  const originalFetch = globalThis.fetch
+  let attempts = 0
+  globalThis.fetch = async () => {
+    attempts += 1
+    const content = attempts === 1 ? '' : JSON.stringify({ status: 'needs_clarification', phase: 'world', question: '请补充游戏类型和整体风格。', options: ['末日废土', '赛博朋克'] })
+    return new Response(JSON.stringify({ choices: [{ message: { content } }] }), { status: 200 })
+  }
+  try {
+    agent.setAgentConfig({ provider: 'deepseek', endpoint: 'https://api.deepseek.com', model: 'deepseek-chat', apiKey: 'fixture-key' })
+    const result = await agent.createNPC([{ role: 'user', content: '我想做一个 NPC' }])
+    assert.equal(attempts, 2)
+    assert.equal(result.status, 'needs_clarification')
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
