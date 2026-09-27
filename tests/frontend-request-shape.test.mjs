@@ -79,10 +79,11 @@ test('asset phase request includes confirmed world context and filters asset fie
   }
   try {
     agent.setAgentConfig({ provider: 'backend', endpoint: 'http://fixture.test/api/npc', model: 'fixture-model' })
-    const result = await agent.createAsset([{ role: 'user', content: '我需要药房外观概念图' }], { world })
+    const result = await agent.createAsset([{ role: 'user', content: '我需要药房外观概念图' }], { world, sourceProfile: { type: 'world', id: 'world:灰烬边城', name: '灰烬边城', content: world } })
     const payload = JSON.parse(calls[0].init.body)
     assert.equal(payload.phase, 'asset')
     assert.deepEqual(payload.world, world)
+    assert.deepEqual(payload.sourceProfile, { type: 'world', id: 'world:灰烬边城', name: '灰烬边城', content: world })
     assert.equal(result.asset.type, '场景概念图')
     assert.equal('review' in result, false)
     assert.equal('score' in result, false)

@@ -82,7 +82,7 @@ export default async function handler(req: any, res: any) {
     try {
       const provider = body.provider === 'deepseek' ? 'deepseek' : 'openai'
       const key = typeof body.apiKey === 'string' && body.apiKey ? body.apiKey : provider === 'deepseek' ? process.env.DEEPSEEK_API_KEY : process.env.OPENAI_API_KEY
-      const result = await runNpcRequest({ messages: body.messages, world: body.world, phase: body.phase || 'world', model: body.model || (provider === 'deepseek' ? process.env.DEEPSEEK_MODEL || 'deepseek-chat' : process.env.OPENAI_MODEL || 'gpt-5'), provider, key, requestId: body.requestId })
+      const result = await runNpcRequest({ messages: body.messages, world: body.world, assetProfile: body.sourceProfile, phase: body.phase || 'world', model: body.model || (provider === 'deepseek' ? process.env.DEEPSEEK_MODEL || 'deepseek-chat' : process.env.OPENAI_MODEL || 'gpt-5'), provider, key, requestId: body.requestId })
       return res.status(200).json(result)
     } catch (error) {
       const requestId = typeof body.requestId === 'string' ? body.requestId : 'unknown'
