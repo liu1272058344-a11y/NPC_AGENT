@@ -5,8 +5,11 @@ import { runNpcRequest } from '../src/server/npcWorkflow.mjs'
 const world = { name: '灰烬边城', genre: '末日废土', era: '灾变后', atmosphere: '危险', coreRule: '配给', centralConflict: '争夺物资', summary: '幸存者寻找秩序' }
 
 test('workflow maps a valid clarification to application state without trusting a model status', async () => {
-  const result = await runNpcRequest({ phase: 'world', messages: [{ role: 'user', content: '做一个世界' }], provider: 'deepseek', model: 'deepseek-chat', key: 'k' }, { requestStructured: async () => ({ status: 'complete', phase: 'world', question: '请补充类型', options: ['末日'] }) })
+  let instructions = ''
+  const result = await runNpcRequest({ phase: 'world', messages: [{ role: 'user', content: '做一个世界' }], provider: 'deepseek', model: 'deepseek-chat', key: 'k' }, { requestStructured: async (request) => { instructions = request.instructions; return { status: 'complete', phase: 'world', question: '请补充类型', options: ['末日'] } } })
   assert.deepEqual(result, { status: 'needs_clarification', phase: 'world', question: '请补充类型', options: ['末日'] })
+  assert.match(instructions, /JSON/)
+  assert.match(instructions, /world_ready/)
 })
 
 test('workflow returns only a validated world or NPC result', async () => {
