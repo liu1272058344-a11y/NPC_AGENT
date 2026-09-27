@@ -117,3 +117,14 @@ test('configured provider requests go through the NPC Forge backend contract', a
     assert.equal(payload.apiKey, 'fixture-key')
   } finally { globalThis.fetch = originalFetch }
 })
+
+test('provider mode never posts the backend contract to a provider URL', async () => {
+  const originalFetch = globalThis.fetch
+  const calls = []
+  globalThis.fetch = async (input, init) => { calls.push({ input, init }); return new Response(JSON.stringify({ status: 'needs_clarification', phase: 'world', question: '补充类型' }), { status: 200 }) }
+  try {
+    agent.setAgentConfig({ provider: 'deepseek', endpoint: 'https://api.deepseek.com', model: 'deepseek-chat', apiKey: 'fixture-key' })
+    await agent.createNPC([{ role: 'user', content: '我想做一个 NPC' }])
+    assert.notEqual(calls[0].input, 'https://api.deepseek.com')
+  } finally { globalThis.fetch = originalFetch }
+})

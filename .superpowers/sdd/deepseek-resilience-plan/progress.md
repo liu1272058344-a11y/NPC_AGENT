@@ -17,3 +17,5 @@ Task 4: complete (tests: `node --test tests/frontend-request-shape.test.mjs` →
 Task 5: complete (tests: `node --test tests/frontend-concurrency.test.mjs tests/frontend-request-shape.test.mjs` → 9/9 pass; `npm run build` pass; commit follows)
 
 Task 6: complete (tests: `node --test tests/*.test.mjs` → 22/22 pass; `npm run lint` pass with 2 pre-existing unused-parameter warnings; `npm run build` pass; `node --check server.mjs` pass; `git diff --check` pass)
+
+Final review: self-review (no subagent tool). Review focus checked: provider status/finish handling, bounded retry, public error redaction, backend endpoint routing, request cancellation, stale response suppression. One deferred architectural minor remains: legacy review helper code in `server.mjs` and `api/npc.ts` is retained for existing direct unit tests but production handlers now route through `npcWorkflow.mjs`.

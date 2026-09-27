@@ -8,6 +8,7 @@ export interface CreateAssetOptions { world: WorldProfile; signal?: AbortSignal;
 export interface AgentConfig { endpoint: string; model: string; provider: 'backend' | 'deepseek' | 'openai'; apiKey: string }
 let config: AgentConfig = { endpoint: 'https://api.deepseek.com', model: 'deepseek-chat', provider: 'deepseek', apiKey: '' }
 export const setAgentConfig = (next: Partial<AgentConfig>) => { config = { ...config, ...next } }
+const gatewayEndpoint = () => config.provider === 'backend' ? config.endpoint : config.endpoint.includes('api.deepseek.com') || config.endpoint.includes('api.openai.com') ? (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? 'http://localhost:8787/api/npc' : '/api/npc') : config.endpoint
 const parseJsonCandidate = (value: string): unknown => {
   const cleaned = String(value ?? '').replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim()
   if (!cleaned) throw new Error('模型返回的内容为空，请点击重试。')
@@ -116,7 +117,7 @@ export const buildAssetPromptText = (asset: ArtAssetPrompt): string => [
 
 export async function createAsset(messages: AgentMessage[], options: CreateAssetOptions): Promise<{ status: 'complete'; phase: 'asset'; asset: ArtAssetPrompt }> {
   const direct = false
-  const endpoint = direct ? `${config.endpoint.replace(/\/$/, '')}/chat/completions` : config.endpoint
+  const endpoint = gatewayEndpoint()
   const request = { messages, model: config.model, provider: config.provider === 'backend' ? undefined : config.provider, apiKey: config.provider === 'backend' ? undefined : config.apiKey, phase: 'asset', world: options.world }
   const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json', ...(direct ? { Authorization: `Bearer ${config.apiKey}` } : {}) }, body: JSON.stringify({ ...request, requestId: options.requestId }), signal: options.signal })
   const raw = await response.text(); let body: any
@@ -128,7 +129,7 @@ export async function createAsset(messages: AgentMessage[], options: CreateAsset
 
 export async function createNPC(messages: AgentMessage[], options: CreateNPCOptions = {}): Promise<CreatorReply> {
   const direct = false
-  const endpoint = direct ? `${config.endpoint.replace(/\/$/, '')}/chat/completions` : config.endpoint
+  const endpoint = gatewayEndpoint()
   const request = direct
     ? { model: config.model, messages: [{ role: 'system', content: '你是 NPC Creator Agent，工作流分为两阶段。第一阶段先构思世界观；信息不足时一次最多合并询问2-3个最关键问题，已有信息不要重复询问，并提供选择项；充分后返回完整 world。确认世界观后进入 NPC 阶段，一次最多合并询问2-3个缺失字段，优先询问用途、玩家关系、目标和冲突；信息完整后直接返回完整 npc。NPC 必须自动命名，background 包含过去经历、当前处境及与玩家相遇原因，personality 与 behaviorRules 各至少3项。只返回合法 JSON，绝不返回空内容。' }, ...messages], response_format: { type: 'json_object' }, stream: false }
     : { messages, model: config.model, provider: config.provider === 'backend' ? undefined : config.provider, apiKey: config.provider === 'backend' ? undefined : config.apiKey, phase: options.phase || 'world', ...(options.phase === 'npc' && options.world ? { world: options.world } : {}) }
