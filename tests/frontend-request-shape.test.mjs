@@ -97,3 +97,9 @@ test('asset prompt text combines copyable prompt sections', () => {
   assert.match(agent.buildAssetPromptText(asset), /wasteland medicine bottle/)
   assert.match(agent.buildAssetPromptText(asset), /PNG/)
 })
+
+test('asset planner requires a complete confirmed world', () => {
+  assert.equal(agent.hasConfirmedWorld(world), true)
+  assert.equal(agent.hasConfirmedWorld(null), false)
+  assert.equal(agent.hasConfirmedWorld({ ...world, centralConflict: ' ' }), false)
+})

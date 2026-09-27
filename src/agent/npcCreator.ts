@@ -49,6 +49,7 @@ const npcStringFields: Array<keyof NPC> = ['id', 'name', 'role', 'world', 'funct
 const assetFields: Array<keyof ArtAssetPrompt> = ['type', 'style', 'composition', 'palette', 'lighting', 'format', 'aspectRatio', 'promptZh', 'promptEn', 'negativePrompt']
 const publicStringList = (value: unknown): string[] | undefined => Array.isArray(value) ? value.map((item) => String(item).trim()).filter(Boolean) : undefined
 const hasText = (value: unknown): value is string => typeof value === 'string' && value.trim().length > 0
+export const hasConfirmedWorld = (value: unknown): value is WorldProfile => !!value && typeof value === 'object' && worldFields.every((field) => hasText((value as Record<string, unknown>)[field]))
 
 /**
  * Keep the browser contract deliberately smaller than the backend response.
