@@ -23,6 +23,21 @@ export interface WorldProfile {
   summary: string
 }
 
+export interface ArtAssetPrompt {
+  type: string
+  style: string
+  objects: string[]
+  composition: string
+  palette: string
+  lighting: string
+  details: string[]
+  format: string
+  aspectRatio: string
+  promptZh: string
+  promptEn: string
+  negativePrompt: string
+}
+
 export interface NPCDraft {
   worldOptions: string[]
   roleOptions: string[]

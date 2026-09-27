@@ -1,8 +1,9 @@
-import type { NPC, ReviewResult, WorldProfile } from '../types/npc'
+import type { ArtAssetPrompt, NPC, ReviewResult, WorldProfile } from '../types/npc'
 export type { ReviewResult } from '../types/npc'
 export interface AgentMessage { role: 'user' | 'assistant'; content: string }
 export interface CreatorReply { status: 'needs_clarification' | 'world_ready' | 'complete'; phase?: 'world' | 'npc'; question?: string; options?: string[]; missingFields?: string[]; world?: WorldProfile; npc?: NPC }
 export interface CreateNPCOptions { phase?: 'world' | 'npc'; world?: WorldProfile }
+export interface CreateAssetOptions { world: WorldProfile }
 
 export interface AgentConfig { endpoint: string; model: string; provider: 'backend' | 'deepseek' | 'openai'; apiKey: string }
 let config: AgentConfig = { endpoint: 'https://api.deepseek.com', model: 'deepseek-chat', provider: 'deepseek', apiKey: '' }
@@ -45,6 +46,7 @@ const parseCreatorJson = (value: string): CreatorReply => parseJsonCandidate(val
 const worldFields: Array<keyof WorldProfile> = ['name', 'genre', 'era', 'atmosphere', 'coreRule', 'centralConflict', 'summary']
 const npcFields: Array<keyof NPC> = ['id', 'name', 'role', 'world', 'function', 'summary', 'goal', 'speechStyle', 'background', 'behaviorRules', 'sourcePrompt', 'personality']
 const npcStringFields: Array<keyof NPC> = ['id', 'name', 'role', 'world', 'function', 'summary', 'goal', 'speechStyle', 'background', 'sourcePrompt']
+const assetFields: Array<keyof ArtAssetPrompt> = ['type', 'style', 'composition', 'palette', 'lighting', 'format', 'aspectRatio', 'promptZh', 'promptEn', 'negativePrompt']
 const publicStringList = (value: unknown): string[] | undefined => Array.isArray(value) ? value.map((item) => String(item).trim()).filter(Boolean) : undefined
 const hasText = (value: unknown): value is string => typeof value === 'string' && value.trim().length > 0
 
@@ -93,6 +95,35 @@ export const sanitizeCreatorReply = (value: unknown): CreatorReply => {
     if (!candidate || npcStringFields.some((field) => !hasText(candidate[field])) || !Array.isArray(candidate.personality) || candidate.personality.length === 0 || !Array.isArray(candidate.behaviorRules) || candidate.behaviorRules.length === 0) throw new Error('NPC生成结果不完整，请点击重试。')
   }
   return reply
+}
+
+const sanitizeAsset = (value: unknown): ArtAssetPrompt => {
+  const source = value && typeof value === 'object' ? value as Record<string, unknown> : {}
+  const asset = {} as ArtAssetPrompt
+  for (const field of assetFields) if (hasText(source[field])) (asset as any)[field] = String(source[field]).trim()
+  for (const field of ['objects', 'details'] as const) (asset as any)[field] = publicStringList(source[field]) || []
+  if (assetFields.some((field) => !hasText(asset[field])) || !asset.objects.length || !asset.details.length) throw new Error('美术资源拆解结果不完整，请点击重试。')
+  return asset
+}
+
+export const buildAssetPromptText = (asset: ArtAssetPrompt): string => [
+  `资源类型：${asset.type}`, `艺术风格：${asset.style}`, `核心物件：${asset.objects.join('、')}`,
+  `构图视角：${asset.composition}`, `色彩：${asset.palette}`, `光照：${asset.lighting}`,
+  `细节：${asset.details.join('、')}`, `格式：${asset.format}`, `比例：${asset.aspectRatio}`,
+  `中文提示词：${asset.promptZh}`, `英文提示词：${asset.promptEn}`, `反向提示词：${asset.negativePrompt}`
+].join('\n')
+
+export async function createAsset(messages: AgentMessage[], options: CreateAssetOptions): Promise<{ status: 'complete'; phase: 'asset'; asset: ArtAssetPrompt }> {
+  const direct = config.provider !== 'backend'
+  const endpoint = direct ? `${config.endpoint.replace(/\/$/, '')}/chat/completions` : config.endpoint
+  const system = `你是游戏美术资源提示词拆解 Agent。根据已确认的世界观和用户需求，生成完整 JSON。必须包含 asset：type、style、objects（至少3项）、composition、palette、lighting、details（至少3项）、format、aspectRatio、promptZh、promptEn、negativePrompt。只返回合法 JSON，不要解释。已确认世界观：${JSON.stringify(options.world)}`
+  const request = direct ? { model: config.model, messages: [{ role: 'system', content: system }, ...messages], response_format: { type: 'json_object' }, stream: false } : { messages, model: config.model, phase: 'asset', world: options.world }
+  const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json', ...(direct ? { Authorization: `Bearer ${config.apiKey}` } : {}) }, body: JSON.stringify(request) })
+  const raw = await response.text(); let body: any
+  try { body = JSON.parse(raw) } catch { throw new Error(raw || `Backend returned an empty response (${response.status})`) }
+  if (!response.ok) throw new Error(body.error || '美术资源生成失败，请点击重试。')
+  const value = direct ? parseCreatorJson(String(body.choices?.[0]?.message?.content || '{}')) : body
+  return { status: 'complete', phase: 'asset', asset: sanitizeAsset((value as any).asset || value) }
 }
 
 export async function createNPC(messages: AgentMessage[], options: CreateNPCOptions = {}): Promise<CreatorReply> {

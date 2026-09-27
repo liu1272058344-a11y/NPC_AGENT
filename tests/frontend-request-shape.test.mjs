@@ -67,3 +67,33 @@ test('frontend rejects partial finalized responses but preserves clarification r
     { status: 'needs_clarification', phase: 'world', question: '游戏类型是什么？', options: ['末日废土'] }
   )
 })
+
+test('asset phase request includes confirmed world context and filters asset fields', async () => {
+  const calls = []
+  const originalFetch = globalThis.fetch
+  globalThis.fetch = async (input, init) => {
+    calls.push({ input, init })
+    return new Response(JSON.stringify({ status: 'complete', phase: 'asset', asset: {
+      type: '场景概念图', style: '末日废土写实概念艺术', objects: ['药房招牌', '急救箱'], composition: '正面广角', palette: '灰褐与暗红', lighting: '阴天散射光', details: ['锈蚀金属', '积雪'], format: 'PNG', aspectRatio: '16:9', promptZh: '末日废土药房', promptEn: 'post-apocalyptic pharmacy', negativePrompt: '现代城市高楼'
+    }, score: 99, review: { approved: true } }), { status: 200 })
+  }
+  try {
+    agent.setAgentConfig({ provider: 'backend', endpoint: 'http://fixture.test/api/npc', model: 'fixture-model' })
+    const result = await agent.createAsset([{ role: 'user', content: '我需要药房外观概念图' }], { world })
+    const payload = JSON.parse(calls[0].init.body)
+    assert.equal(payload.phase, 'asset')
+    assert.deepEqual(payload.world, world)
+    assert.equal(result.asset.type, '场景概念图')
+    assert.equal('review' in result, false)
+    assert.equal('score' in result, false)
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test('asset prompt text combines copyable prompt sections', () => {
+  const asset = { type: '道具', style: '写实', objects: ['药瓶'], composition: '特写', palette: '灰蓝', lighting: '冷光', details: ['磨损'], format: 'PNG', aspectRatio: '1:1', promptZh: '废土药瓶', promptEn: 'wasteland medicine bottle', negativePrompt: '现代塑料包装' }
+  assert.match(agent.buildAssetPromptText(asset), /废土药瓶/)
+  assert.match(agent.buildAssetPromptText(asset), /wasteland medicine bottle/)
+  assert.match(agent.buildAssetPromptText(asset), /PNG/)
+})
