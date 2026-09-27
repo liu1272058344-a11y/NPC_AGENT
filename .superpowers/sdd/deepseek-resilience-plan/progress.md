@@ -11,3 +11,5 @@ Task 1: complete (tests: `node --test tests/server-contracts.test.mjs` → 2/2 p
 Task 2: complete (tests: `node --test tests/llm-gateway.test.mjs` → 4/4 pass; commit follows)
 
 Task 3: complete (tests: `node --test tests/server-workflow.test.mjs tests/server-review-loop.test.mjs tests/server-npc-review-loop.test.mjs` → 7/7 pass; commit follows)
+
+Task 4: complete (tests: `node --test tests/frontend-request-shape.test.mjs` → 7/7 pass; commit follows)
