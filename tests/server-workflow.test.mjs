@@ -3,7 +3,6 @@ import test from 'node:test'
 import { runNpcRequest } from '../src/server/npcWorkflow.mjs'
 
 const world = { name: '灰烬边城', genre: '末日废土', era: '灾变后', atmosphere: '危险', coreRule: '配给', centralConflict: '争夺物资', summary: '幸存者寻找秩序' }
-const npc = { id: 'n1', name: '药房守门人', role: '医生', world: '灰烬边城', function: '任务发布者', summary: '守护药房', background: '过去是外科医生，现在守护药房并因此遇见玩家。', goal: '保护药品', speechStyle: '克制', sourcePrompt: '医生', personality: ['谨慎'], behaviorRules: ['不浪费药品'] }
 
 test('workflow maps a valid clarification to application state without trusting a model status', async () => {
   const result = await runNpcRequest({ phase: 'world', messages: [{ role: 'user', content: '做一个世界' }], provider: 'deepseek', model: 'deepseek-chat', key: 'k' }, { requestStructured: async () => ({ status: 'complete', phase: 'world', question: '请补充类型', options: ['末日'] }) })

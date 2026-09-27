@@ -15,3 +15,5 @@ Task 3: complete (tests: `node --test tests/server-workflow.test.mjs tests/serve
 Task 4: complete (tests: `node --test tests/frontend-request-shape.test.mjs` → 7/7 pass; commit follows)
 
 Task 5: complete (tests: `node --test tests/frontend-concurrency.test.mjs tests/frontend-request-shape.test.mjs` → 9/9 pass; `npm run build` pass; commit follows)
+
+Task 6: complete (tests: `node --test tests/*.test.mjs` → 22/22 pass; `npm run lint` pass with 2 pre-existing unused-parameter warnings; `npm run build` pass; `node --check server.mjs` pass; `git diff --check` pass)
