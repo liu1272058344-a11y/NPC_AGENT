@@ -79,16 +79,15 @@ export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' })
   const body = req.body || {}
   if (Array.isArray(body.messages)) {
-    if (!process.env.OPENAI_API_KEY) return res.status(503).json({ error: 'OPENAI_API_KEY is not configured' })
     try {
-      const result = body.phase === 'npc'
-        ? await runReviewedNpcGeneration({ messages: body.messages, world: body.world, model: body.model || process.env.OPENAI_MODEL || 'gpt-5' })
-        : body.phase === 'asset'
-          ? await runAssetGeneration({ messages: body.messages, world: body.world, model: body.model || process.env.OPENAI_MODEL || 'gpt-5' })
-          : await runReviewedWorldGeneration({ messages: body.messages, model: body.model || process.env.OPENAI_MODEL || 'gpt-5' })
+      const provider = body.provider === 'deepseek' ? 'deepseek' : 'openai'
+      const key = typeof body.apiKey === 'string' && body.apiKey ? body.apiKey : provider === 'deepseek' ? process.env.DEEPSEEK_API_KEY : process.env.OPENAI_API_KEY
+      const result = await runNpcRequest({ messages: body.messages, world: body.world, phase: body.phase || 'world', model: body.model || (provider === 'deepseek' ? process.env.DEEPSEEK_MODEL || 'deepseek-chat' : process.env.OPENAI_MODEL || 'gpt-5'), provider, key, requestId: body.requestId })
       return res.status(200).json(result)
     } catch (error) {
-      return res.status(error && typeof error === 'object' && 'statusCode' in error ? Number((error as any).statusCode) || 502 : 502).json({ error: error instanceof Error ? error.message : '模型请求失败，请点击重试。' })
+      const requestId = typeof body.requestId === 'string' ? body.requestId : 'unknown'
+      const publicError = toPublicError(error, requestId)
+      return res.status(error && typeof error === 'object' && 'statusCode' in error ? Number((error as any).statusCode) || 502 : 502).json(publicError)
     }
   }
   if (!process.env.OPENAI_API_KEY) return res.status(503).json({ error: 'OPENAI_API_KEY is not configured' })
@@ -98,3 +97,5 @@ export default async function handler(req: any, res: any) {
   if (!response.ok) return res.status(502).json({ error: 'OpenAI request failed' })
   const parsedResponse = await response.json(); try { return res.status(200).json(publicReply(parseJsonOutput(parsedResponse.output_text), action)) } catch (error) { return res.status(502).json({ error: error instanceof Error ? error.message : '模型返回内容不完整，请点击重试。' }) }
 }
+import { runNpcRequest } from '../src/server/npcWorkflow.mjs'
+import { toPublicError } from '../src/server/errors.mjs'
