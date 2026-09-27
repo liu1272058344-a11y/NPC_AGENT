@@ -7,3 +7,5 @@ Ruling: execute in the existing `master` checkout — the user explicitly author
 Task 1: Ruling: runtime contracts use `.mjs` plus `.d.ts` rather than importing `.ts` directly — Node's native test runner cannot load TypeScript without a new runtime loader, while the declarations preserve TypeScript consumers; cost if wrong: type declarations could drift and require a later typed wrapper.
 
 Task 1: complete (tests: `node --test tests/server-contracts.test.mjs` → 2/2 pass; commit follows)
+
+Task 2: complete (tests: `node --test tests/llm-gateway.test.mjs` → 4/4 pass; commit follows)
