@@ -2,8 +2,8 @@ import type { ArtAssetPrompt, NPC, ReviewResult, WorldProfile } from '../types/n
 export type { ReviewResult } from '../types/npc'
 export interface AgentMessage { role: 'user' | 'assistant'; content: string }
 export interface CreatorReply { status: 'needs_clarification' | 'world_ready' | 'complete'; phase?: 'world' | 'npc'; question?: string; options?: string[]; missingFields?: string[]; world?: WorldProfile; npc?: NPC }
-export interface CreateNPCOptions { phase?: 'world' | 'npc'; world?: WorldProfile }
-export interface CreateAssetOptions { world: WorldProfile }
+export interface CreateNPCOptions { phase?: 'world' | 'npc'; world?: WorldProfile; signal?: AbortSignal; requestId?: string }
+export interface CreateAssetOptions { world: WorldProfile; signal?: AbortSignal; requestId?: string }
 
 export interface AgentConfig { endpoint: string; model: string; provider: 'backend' | 'deepseek' | 'openai'; apiKey: string }
 let config: AgentConfig = { endpoint: 'https://api.deepseek.com', model: 'deepseek-chat', provider: 'deepseek', apiKey: '' }
@@ -117,9 +117,8 @@ export const buildAssetPromptText = (asset: ArtAssetPrompt): string => [
 export async function createAsset(messages: AgentMessage[], options: CreateAssetOptions): Promise<{ status: 'complete'; phase: 'asset'; asset: ArtAssetPrompt }> {
   const direct = false
   const endpoint = direct ? `${config.endpoint.replace(/\/$/, '')}/chat/completions` : config.endpoint
-  const system = `你是游戏美术资源提示词拆解 Agent。根据已确认的世界观和用户需求，生成完整 JSON。必须包含 asset：type、style、objects（至少3项）、composition、palette、lighting、details（至少3项）、format、aspectRatio、promptZh、promptEn、negativePrompt。只返回合法 JSON，不要解释。已确认世界观：${JSON.stringify(options.world)}`
   const request = { messages, model: config.model, provider: config.provider === 'backend' ? undefined : config.provider, apiKey: config.provider === 'backend' ? undefined : config.apiKey, phase: 'asset', world: options.world }
-  const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json', ...(direct ? { Authorization: `Bearer ${config.apiKey}` } : {}) }, body: JSON.stringify(request) })
+  const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json', ...(direct ? { Authorization: `Bearer ${config.apiKey}` } : {}) }, body: JSON.stringify({ ...request, requestId: options.requestId }), signal: options.signal })
   const raw = await response.text(); let body: any
   try { body = JSON.parse(raw) } catch { throw new Error(raw || `Backend returned an empty response (${response.status})`) }
   if (!response.ok) throw new Error(body.error || '美术资源生成失败，请点击重试。')
@@ -136,7 +135,7 @@ export async function createNPC(messages: AgentMessage[], options: CreateNPCOpti
   let lastError: unknown
   for (let attempt = 0; attempt < (direct ? 2 : 1); attempt += 1) {
     try {
-      const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json', ...(direct ? { Authorization: `Bearer ${config.apiKey}` } : {}) }, body: JSON.stringify(request) })
+      const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json', ...(direct ? { Authorization: `Bearer ${config.apiKey}` } : {}) }, body: JSON.stringify({ ...request, requestId: options.requestId }), signal: options.signal })
       const raw = await response.text(); let body: any
       try { body = JSON.parse(raw) } catch { throw new Error(raw || `Backend returned an empty response (${response.status})`) }
       if (!response.ok) throw new Error(body.error || 'NPC Creator Agent request failed')
