@@ -2,6 +2,7 @@ import { createServer } from 'node:http'
 import { existsSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { runNpcRequest } from './src/server/npcWorkflow.mjs'
+import { toPublicError } from './src/server/errors.mjs'
 
 if (existsSync('.env.local')) for (const line of readFileSync('.env.local', 'utf8').split(/\r?\n/)) { const match = line.match(/^([^#=]+)=(.*)$/); if (match && !process.env[match[1]]) process.env[match[1]] = match[2].trim().replace(/^['"]|['"]$/g, '') }
 
@@ -95,5 +96,5 @@ export const runAssetGeneration = async ({ messages, world, model, provider, key
 }
 
 export const handleRequest = async ({ messages, model, phase = 'world', world, provider = (process.env.AI_PROVIDER || 'openai').toLowerCase(), key, apiKey, requestId, signal }) => { const selectedModel = provider === 'deepseek' ? (typeof model === 'string' && model.startsWith('deepseek') ? model : process.env.DEEPSEEK_MODEL || 'deepseek-chat') : model || process.env.OPENAI_MODEL || 'gpt-5'; const selectedKey = apiKey || key || (provider === 'deepseek' ? process.env.DEEPSEEK_API_KEY : process.env.OPENAI_API_KEY); return runNpcRequest({ messages, model: selectedModel, phase, world, provider, key: selectedKey, requestId, signal }) }
-export const startServer = (port = 8787) => createServer(async (req, res) => { if (req.method === 'OPTIONS') return send(res, 204, {}); if (req.method !== 'POST' || req.url !== '/api/npc') return send(res, 404, { error: 'Not found' }); let raw = ''; for await (const chunk of req) raw += chunk; try { const result = await handleRequest(JSON.parse(raw)); return send(res, 200, result) } catch (error) { return send(res, error?.statusCode || 500, { error: error instanceof Error ? error.message : 'Unexpected server error' }) } }).listen(port, () => console.log(`NPC Creator API listening at http://localhost:8787`))
+export const startServer = (port = 8787) => createServer(async (req, res) => { if (req.method === 'OPTIONS') return send(res, 204, {}); if (req.method !== 'POST' || req.url !== '/api/npc') return send(res, 404, { error: 'Not found' }); let raw = ''; for await (const chunk of req) raw += chunk; let body = {}; try { body = JSON.parse(raw); const result = await handleRequest(body); return send(res, 200, result) } catch (error) { return send(res, error?.statusCode || 500, toPublicError(error, body?.requestId || 'unknown')) } }).listen(port, () => console.log(`NPC Creator API listening at http://localhost:8787`))
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) startServer()

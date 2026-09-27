@@ -60,7 +60,7 @@ export const hasConfirmedWorld = (value: unknown): value is WorldProfile => !!va
 export const sanitizeCreatorReply = (value: unknown): CreatorReply => {
   const source = value && typeof value === 'object' ? value as Record<string, unknown> : {}
   const status = source.status
-  if (status !== 'needs_clarification' && status !== 'world_ready' && status !== 'complete') throw new Error('模型返回了无效的创建状态，请点击重试。')
+  if (status !== 'needs_clarification' && status !== 'world_ready' && status !== 'complete') throw new Error('模型返回的数据结构无法识别。请检查 API 响应或稍后重试。')
   const reply: CreatorReply = { status }
   const publicReply = reply as unknown as Record<string, unknown>
   if (source.phase === 'world' || source.phase === 'npc') reply.phase = source.phase
@@ -139,7 +139,7 @@ export async function createNPC(messages: AgentMessage[], options: CreateNPCOpti
       const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json', ...(direct ? { Authorization: `Bearer ${config.apiKey}` } : {}) }, body: JSON.stringify({ ...request, requestId: options.requestId }), signal: options.signal })
       const raw = await response.text(); let body: any
       try { body = JSON.parse(raw) } catch { throw new Error(raw || `Backend returned an empty response (${response.status})`) }
-      if (!response.ok) throw new Error(body.error || 'NPC Creator Agent request failed')
+      if (!response.ok) throw new Error(body.message || body.error || 'NPC Creator Agent request failed')
       if (direct) { const text = body.choices?.[0]?.message?.content || ''; if (!String(text).trim()) throw new Error('模型返回了空内容'); return sanitizeCreatorReply(parseCreatorJson(String(text))) }
       return sanitizeCreatorReply(body)
     } catch (error) { lastError = error }

@@ -7,5 +7,6 @@ export interface GatewayRequest {
   schema: Record<string, unknown>
   signal?: AbortSignal
   requestId?: string
+  logger?: (entry: Record<string, unknown>) => void
 }
 export declare const requestStructured: (options: GatewayRequest) => Promise<unknown>
