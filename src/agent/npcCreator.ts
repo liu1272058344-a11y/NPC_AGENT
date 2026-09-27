@@ -1,9 +1,9 @@
-import type { ArtAssetPrompt, AssetSourceProfile, NPC, ReviewResult, WorldProfile } from '../types/npc'
+import type { ArtAssetPrompt, GameContentProfile, NPC, ReviewResult, WorldProfile } from '../types/npc'
 export type { ReviewResult } from '../types/npc'
 export interface AgentMessage { role: 'user' | 'assistant'; content: string }
 export interface CreatorReply { status: 'needs_clarification' | 'world_ready' | 'complete'; phase?: 'world' | 'npc'; question?: string; options?: string[]; missingFields?: string[]; world?: WorldProfile; npc?: NPC }
 export interface CreateNPCOptions { phase?: 'world' | 'npc'; world?: WorldProfile; signal?: AbortSignal; requestId?: string }
-export interface CreateAssetOptions { world: WorldProfile; sourceProfile?: AssetSourceProfile; signal?: AbortSignal; requestId?: string }
+export interface CreateAssetOptions { world?: WorldProfile; contentProfile: GameContentProfile; signal?: AbortSignal; requestId?: string }
 
 export interface AgentConfig { endpoint: string; model: string; provider: 'backend' | 'deepseek' | 'openai'; apiKey: string }
 let config: AgentConfig = { endpoint: 'https://api.deepseek.com', model: 'deepseek-chat', provider: 'deepseek', apiKey: '' }
@@ -118,7 +118,7 @@ export const buildAssetPromptText = (asset: ArtAssetPrompt): string => [
 export async function createAsset(messages: AgentMessage[], options: CreateAssetOptions): Promise<{ status: 'complete'; phase: 'asset'; asset: ArtAssetPrompt }> {
   const direct = false
   const endpoint = gatewayEndpoint()
-  const request = { messages, model: config.model, provider: config.provider === 'backend' ? undefined : config.provider, apiKey: config.provider === 'backend' ? undefined : config.apiKey, phase: 'asset', world: options.world, sourceProfile: options.sourceProfile }
+  const request = { messages, model: config.model, provider: config.provider === 'backend' ? undefined : config.provider, apiKey: config.provider === 'backend' ? undefined : config.apiKey, phase: 'asset', world: options.world, contentProfile: options.contentProfile }
   const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json', ...(direct ? { Authorization: `Bearer ${config.apiKey}` } : {}) }, body: JSON.stringify({ ...request, requestId: options.requestId }), signal: options.signal })
   const raw = await response.text(); let body: any
   try { body = JSON.parse(raw) } catch { throw new Error(raw || `Backend returned an empty response (${response.status})`) }

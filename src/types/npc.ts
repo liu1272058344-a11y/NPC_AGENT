@@ -23,11 +23,13 @@ export interface WorldProfile {
   summary: string
 }
 
-export interface AssetSourceProfile {
-  type: 'world' | 'npc'
+export interface GameContentProfile {
   id: string
   name: string
-  content: WorldProfile | NPC
+  source: 'agent' | 'manual'
+  world?: WorldProfile
+  npc?: NPC
+  notes?: string
 }
 
 export interface ArtAssetPrompt {
