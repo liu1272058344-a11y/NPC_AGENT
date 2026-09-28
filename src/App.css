@@ -88,6 +88,16 @@
 .asset-source-summary { margin-top: 14px; padding: 14px; border-left: 3px solid #00e5ff; border-radius: 8px; background: #182032; }
 .asset-source-summary strong { color: #fff; font-size: 13px; }
 .asset-source-summary p { margin: 8px 0 0; color: #c2cada; font-size: 12px; line-height: 1.55; }
+.library-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.asset-card { overflow: hidden; border: 1px solid #2c3850; border-radius: 10px; background: #182032; }
+.asset-preview { display: grid; min-height: 120px; place-items: center; color: #00e5ff; background: linear-gradient(135deg, #182032, #29244e); font-size: 11px; }
+.asset-card h3, .asset-card p, .asset-card small { display: block; margin: 12px 14px 0; }
+.asset-card p, .asset-card small { color: #94a1b8; font-size: 11px; }
+.asset-card small { margin-bottom: 14px; }
+.export-grid { display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+.export-grid h3 { margin: 8px 0; }
+.export-grid p { color: #94a1b8; font-size: 12px; }
+.export-actions { display: flex; align-items: center; gap: 8px; }
 @media (max-width: 640px) { .asset-profiles { grid-template-columns: 1fr; } }
 .option-hint { margin: 12px 0 0; color: #94a1b8; font-size: 11px; }
 @media (max-width: 640px) { .app-shell { display: block; } .sidebar { min-height: auto; width: 100%; padding: 18px 16px 14px; } .nav-list { display: flex; overflow-x: auto; margin-top: 18px; } .nav-item { flex: 0 0 auto; width: auto; } .version { display: none; } .topbar { height: 60px; padding: 0 20px; } .search-hint { display: none; } .content { margin-top: 20px; padding: 0 16px; } .hero-card { align-items: flex-start; flex-direction: column; padding: 22px; } .hero-card h2 { font-size: 23px; line-height: 29px; } .primary-button { width: 100%; } .panel { padding: 20px; } .status-row { flex-direction: column; } }
