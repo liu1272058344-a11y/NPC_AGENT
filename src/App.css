@@ -98,6 +98,7 @@
 .export-grid h3 { margin: 8px 0; }
 .export-grid p { color: #94a1b8; font-size: 12px; }
 .export-actions { display: flex; align-items: center; gap: 8px; }
+.generated-image { display: block; width: min(100%, 720px); margin-top: 18px; border: 1px solid #2c3850; border-radius: 12px; background: #182032; }
 @media (max-width: 640px) { .asset-profiles { grid-template-columns: 1fr; } }
 .option-hint { margin: 12px 0 0; color: #94a1b8; font-size: 11px; }
 @media (max-width: 640px) { .app-shell { display: block; } .sidebar { min-height: auto; width: 100%; padding: 18px 16px 14px; } .nav-list { display: flex; overflow-x: auto; margin-top: 18px; } .nav-item { flex: 0 0 auto; width: auto; } .version { display: none; } .topbar { height: 60px; padding: 0 20px; } .search-hint { display: none; } .content { margin-top: 20px; padding: 0 16px; } .hero-card { align-items: flex-start; flex-direction: column; padding: 22px; } .hero-card h2 { font-size: 23px; line-height: 29px; } .primary-button { width: 100%; } .panel { padding: 20px; } .status-row { flex-direction: column; } }
