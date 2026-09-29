@@ -25,3 +25,6 @@ dist-ssr
 *.sw?
 __pycache__/
 *.py[cod]
+
+# Runtime persistence (local SQLite databases)
+data/

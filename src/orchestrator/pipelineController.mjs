@@ -2,6 +2,7 @@ import { runPipeline } from '../server/pipelineBridge.mjs'
 import { failedResult, successResult } from '../schemas/agentResult.mjs'
 import { createRunContext, recordStep } from './runContext.mjs'
 import { getAgent, listAgents, registerAgent } from './agentRegistry.mjs'
+import { createDatabase, savePipelineResult } from '../persistence/database.mjs'
 
 registerAgent('game_agent', async (input) => input)
 registerAgent('world_agent', async (input) => input)
@@ -11,7 +12,7 @@ registerAgent('prompt_optimizer', async (input) => input)
 registerAgent('asset_agent', async (input) => input)
 
 export class PipelineController {
-  constructor({ pipelineRunner = runPipeline } = {}) { this.pipelineRunner = pipelineRunner }
+  constructor({ pipelineRunner = runPipeline, db = createDatabase() } = {}) { this.pipelineRunner = pipelineRunner; this.db = db }
 
   async run(input = {}) {
     const context = createRunContext(input)
@@ -21,7 +22,9 @@ export class PipelineController {
       for (const step of steps) { if (!getAgent(step)) throw new Error(`Unknown pipeline agent: ${step}`); recordStep(context, step, 'started') }
       const output = await this.pipelineRunner({ requirement: input.requirement, style: input.style || '', assetType: input.assetType || 'character' }, input.options || {})
       for (const step of steps) recordStep(context, step, 'completed')
-      return { ...output, ...successResult(context.run_id, 'pipeline_controller', output), run_id: context.run_id, schema_version: context.schema_version, steps: context.steps }
+      const result = { ...output, ...successResult(context.run_id, 'pipeline_controller', output), run_id: context.run_id, schema_version: context.schema_version, steps: context.steps }
+      savePipelineResult(this.db, result)
+      return result
     } catch (error) {
       recordStep(context, 'pipeline_controller', 'failed', { message: error instanceof Error ? error.message : String(error) })
       return { ...failedResult(context.run_id, 'pipeline_controller', { code: 'PIPELINE_FAILED', message: error instanceof Error ? error.message : String(error) }), run_id: context.run_id, schema_version: context.schema_version, steps: context.steps }
