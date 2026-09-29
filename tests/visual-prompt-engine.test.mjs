@@ -15,6 +15,13 @@ test('Visual Agent maps Character JSON into a complete visual asset', () => {
   assert.equal(asset.status, 'draft')
 })
 
+test('Visual Agent accepts the existing flat NPC response shape', () => {
+  const asset = buildVisualAsset({ id: 'npc-flat', name: '霓虹医师', role: '地下医生', background: '在黑市诊所工作', world: '赛博朋克城', sourcePrompt: '义体诊所' })
+  assert.equal(asset.source_character_id, 'npc-flat')
+  assert.equal(asset.subject, '霓虹医师')
+  assert.match(asset.environment, /赛博朋克城/)
+})
+
 test('Prompt Engine builds sections and critic identifies missing environment', () => {
   const prompt = buildPrompt(buildVisualAsset(character))
   assert.match(prompt.prompt, /维克斯/)
