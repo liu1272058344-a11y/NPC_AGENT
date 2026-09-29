@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "npc-forge/game-project/0.2",
+  "title": "GameProject",
+  "type": "object",
+  "required": ["project_id", "name", "genre", "style", "world", "characters", "assets"],
+  "properties": {
+    "project_id": { "type": "string" },
+    "name": { "type": "string" },
+    "genre": { "type": "string" },
+    "style": { "type": "string" },
+    "world": { "type": ["object", "null"] },
+    "characters": { "type": "array", "items": { "type": "object" } },
+    "assets": { "type": "array", "items": { "type": "object" } }
+  },
+  "additionalProperties": false
+}
