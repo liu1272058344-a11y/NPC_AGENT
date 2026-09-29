@@ -6,7 +6,9 @@ export async function generateImage(prompt: string, negativePrompt = '', apiKey 
   const model = options.model || 'gpt-image-1'
   const size = options.size || '1024x1024'
   const endpoint = (options.endpoint || 'https://api.openai.com/v1').replace(/\/$/, '')
-  const request = provider === 'fal'
+  const request = provider === 'volcengine'
+    ? { url: `${endpoint}/api/v3/images/generations`, headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' }, body: { model, prompt, response_format: 'url', size } }
+    : provider === 'fal'
     ? { url: `${endpoint}/fal-ai/${model}`, headers: { Authorization: `Key ${apiKey}`, 'Content-Type': 'application/json' }, body: { prompt, image_size: size } }
     : provider === 'together'
       ? { url: `${endpoint}/images/generations`, headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' }, body: { model, prompt, width: 1024, height: 1024, steps: 4, n: 1 } }

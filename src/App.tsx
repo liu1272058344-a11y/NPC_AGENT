@@ -31,7 +31,7 @@ function App() {
   const [imageProvider, setImageProvider] = useState(() => sessionStorage.getItem('image-provider') || 'openai')
   const [imageModel, setImageModel] = useState(() => sessionStorage.getItem('image-model') || 'gpt-image-1')
   const [imageApiKey, setImageApiKey] = useState(() => sessionStorage.getItem('image-api-key') || '')
-  const [imageEndpoint, setImageEndpoint] = useState(() => sessionStorage.getItem('image-endpoint') || 'https://api.openai.com/v1')
+  const [imageEndpoint, setImageEndpoint] = useState(() => sessionStorage.getItem('image-endpoint') || 'https://ark.cn-beijing.volces.com')
   const [endpoint, setEndpoint] = useState(() => { const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'; const stored = localStorage.getItem('npc-endpoint'); if (isLocal && !sessionStorage.getItem('npc-api-key')) return 'http://localhost:8787/api/npc'; if (stored && stored !== '/api/npc') return stored; return isLocal ? 'http://localhost:8787/api/npc' : 'https://api.deepseek.com' })
   const [saved, setSaved] = useState(false)
   const [messages, setMessages] = useState<AgentMessage[]>([])
