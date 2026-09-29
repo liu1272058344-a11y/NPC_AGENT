@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { runNpcRequest } from './src/server/npcWorkflow.mjs'
 import { runPipeline } from './src/server/pipelineBridge.mjs'
-import { generateImage } from './src/server/imageService.mjs'
+import { generateImage } from './src/services/image/imageService.mjs'
 import { toPublicError } from './src/server/errors.mjs'
 
 if (existsSync('.env.local')) for (const line of readFileSync('.env.local', 'utf8').split(/\r?\n/)) { const match = line.match(/^([^#=]+)=(.*)$/); if (match && !process.env[match[1]]) process.env[match[1]] = match[2].trim().replace(/^['"]|['"]$/g, '') }

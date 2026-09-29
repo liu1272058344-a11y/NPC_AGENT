@@ -1,6 +1,6 @@
 import { assetResultSchema, npcResultSchema } from './contracts.mjs'
 import { GatewayError } from './errors.mjs'
-import { requestStructured as defaultRequestStructured } from './llmGateway.mjs'
+import { generateStructured as defaultRequestStructured } from '../services/llm/llmService.mjs'
 import { validateWorldSchema } from './worldSchemaValidator.mjs'
 
 const worldJsonSchema = { type: 'object', properties: { name: { type: 'string' }, genre: { type: 'string' }, era: { type: 'string' }, atmosphere: { type: 'string' }, coreRule: { type: 'string' }, centralConflict: { type: 'string' }, summary: { type: 'string' } }, required: ['name', 'genre', 'era', 'atmosphere', 'coreRule', 'centralConflict', 'summary'], additionalProperties: false }
