@@ -20,7 +20,7 @@ export async function generateImage(prompt: string, negativePrompt = '', apiKey 
   const raw = await response.text()
   let body: any = {}
   try { body = raw ? JSON.parse(raw) : {} } catch { throw new Error(`图片服务返回了无法解析的响应（HTTP ${response.status}）`) }
-  if (!response.ok) throw new Error(body.error?.message || body.detail || body.message || '图像生成失败')
+  if (!response.ok) throw new Error(body.message || body.error?.message || body.detail || `图片生成失败（HTTP ${response.status}）`)
   const image = body.data?.[0] || body.images?.[0] || body
   const url = image.url || image.uri || (image.b64_json ? `data:image/png;base64,${image.b64_json}` : image.image?.url)
   if (!url) throw new Error('图片模型返回为空，请检查 Provider、模型和 API Key')
