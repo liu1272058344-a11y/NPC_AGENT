@@ -3,12 +3,12 @@ const usage = (row = {}) => ({ imageCount: Number(row.image_count || 0), byteCou
 export const createAssetDatabase = (query) => ({
   ensureWorkspace: async (workspaceId) => query('INSERT INTO workspaces (id) VALUES ($1) ON CONFLICT (id) DO UPDATE SET last_seen_at = NOW()', [workspaceId]),
   upsertArchive: async (workspaceId, archive) => (await query(`INSERT INTO npc_archives (id, workspace_id, name, summary, profile_json)
-    VALUES ($1,$2,$3,$4,$5::jsonb) ON CONFLICT (id) DO UPDATE SET name=$3, summary=$4, profile_json=$5::jsonb, updated_at=NOW()
-    WHERE npc_archives.workspace_id=$2 RETURNING *`, [archive.id, workspaceId, archive.name, archive.summary || '', JSON.stringify(archive.profile || archive)])).rows[0],
+    VALUES ($1,$2,$3,$4,$5::jsonb) ON CONFLICT (workspace_id,id) DO UPDATE SET name=$3, summary=$4, profile_json=$5::jsonb, updated_at=NOW()
+    RETURNING *`, [archive.id, workspaceId, archive.name, archive.summary || '', JSON.stringify(archive.profile || archive)])).rows[0],
   getWorkspaceUsage: async (workspaceId) => usage((await query('SELECT COUNT(*) AS image_count, COALESCE(SUM(byte_size),0) AS byte_count FROM image_assets WHERE workspace_id=$1', [workspaceId])).rows[0]),
   reserveUsage: async (workspaceId) => usage((await query(`SELECT COUNT(i.id) AS image_count, COALESCE(SUM(i.byte_size),0) AS byte_count FROM workspaces w LEFT JOIN image_assets i ON i.workspace_id=w.id WHERE w.id=$1 GROUP BY w.id FOR UPDATE`, [workspaceId])).rows[0]),
   insertPrompt: async (workspaceId, archiveId, prompt) => (await query(`INSERT INTO prompt_records (id,workspace_id,archive_id,prompt,negative_prompt,provider,model_id)
-    VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT (id) DO UPDATE SET prompt=EXCLUDED.prompt RETURNING *`, [prompt.id, workspaceId, archiveId, prompt.prompt, prompt.negativePrompt || '', prompt.provider || '', prompt.modelId || ''])).rows[0],
+    VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT (workspace_id,id) DO UPDATE SET prompt=EXCLUDED.prompt RETURNING *`, [prompt.id, workspaceId, archiveId, prompt.prompt, prompt.negativePrompt || '', prompt.provider || '', prompt.modelId || ''])).rows[0],
   insertImageAsset: async (record) => (await query(`INSERT INTO image_assets (id,workspace_id,archive_id,prompt_record_id,blob_url,pathname,content_type,byte_size,width,height,provider,model_id,created_at,expires_at,idempotency_key)
     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`, [record.id, record.workspaceId, record.archiveId, record.promptRecordId, record.blobUrl, record.pathname, record.contentType, record.byteSize, record.width || null, record.height || null, record.provider, record.modelId, record.createdAt, record.expiresAt, record.idempotencyKey])).rows[0],
   insertImageWithQuota: async (record, limits) => {

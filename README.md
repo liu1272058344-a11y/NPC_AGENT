@@ -1,5 +1,13 @@
 # React + TypeScript + Vite
 
+## Remote image asset storage
+
+Generated images are persisted in Vercel Blob and indexed in Neon Postgres. Each anonymous browser workspace may keep up to 20 images or 100 MB. Images expire 30 days after saving and the daily Vercel Cron removes expired objects.
+
+Configure `DATABASE_URL`, `BLOB_READ_WRITE_TOKEN`, and `CRON_SECRET` from `.env.example`, then apply `db/migrations/001_remote_asset_library.sql` to Neon before deployment. The browser stores only `npc-forge-workspace-id`; image bytes and Base64 data are never stored in localStorage.
+
+The production smoke check must cover save, refresh/list, archive tabs, zoom, download, delete, quota rejection, and one authorized cleanup request.
+
 This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
 
 Currently, two official plugins are available:

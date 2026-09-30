@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { ASSET_LIMITS, expiresAtFrom } from '../src/server/assets/config.mjs'
 import { createAssetDatabase } from '../src/server/assets/database.mjs'
+import { readFile } from 'node:fs/promises'
 
 test('remote asset limits are fixed by the product policy', () => {
   assert.deepEqual(ASSET_LIMITS, { maxImages: 20, maxBytes: 100 * 1024 * 1024, retentionDays: 30, warningRatio: 0.8, maxSourceBytes: 20 * 1024 * 1024, sourceTimeoutMs: 15000 })
@@ -24,4 +25,10 @@ test('database exposes an atomic quota reservation transaction', async () => {
   const result = await db.reserveUsage('workspace-1')
   assert.deepEqual(result, { imageCount: 1, byteCount: 2048 })
   assert.match(calls[0].text, /FOR UPDATE/)
+})
+
+test('archive and prompt identities are isolated by workspace', async () => {
+  const schema = await readFile(new URL('../db/migrations/001_remote_asset_library.sql', import.meta.url), 'utf8')
+  assert.match(schema, /PRIMARY KEY \(workspace_id, id\)/)
+  assert.match(schema, /FOREIGN KEY \(workspace_id, archive_id\)/)
 })

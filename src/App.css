@@ -136,6 +136,8 @@
 .image-studio-toolbar .section-hint { margin: 0 auto 0 0; }
 .image-studio-result { margin-top: 22px; }
 .asset-retention-note { margin: 10px 0; color: #f5bf67; font-size: 12px; line-height: 1.5; }
+.migration-notice { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; padding: 12px 14px; border: 1px solid #00e5ff55; border-radius: 10px; color: #bdf7ff; background: #00e5ff16; font-size: 12px; }
+.migration-notice button { border: 0; color: #fff; background: transparent; cursor: pointer; }
 @media (max-width: 640px) { .asset-profiles, .archive-image-grid { grid-template-columns: 1fr; } .viewer-toolbar span { display: none; } }
 .option-hint { margin: 12px 0 0; color: #94a1b8; font-size: 11px; }
 @media (max-width: 640px) { .app-shell { display: block; } .sidebar { min-height: auto; width: 100%; padding: 18px 16px 14px; } .nav-list { display: flex; overflow-x: auto; margin-top: 18px; } .nav-item { flex: 0 0 auto; width: auto; } .version { display: none; } .topbar { height: 60px; padding: 0 20px; } .search-hint { display: none; } .content { margin-top: 20px; padding: 0 16px; } .hero-card { align-items: flex-start; flex-direction: column; padding: 22px; } .hero-card h2 { font-size: 23px; line-height: 29px; } .primary-button { width: 100%; } .panel { padding: 20px; } .status-row { flex-direction: column; } }
