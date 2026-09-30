@@ -21,4 +21,5 @@ test('maps quota and database failures to actionable Chinese copy', () => {
   assert.match(assetErrorMessage('QUOTA_COUNT_EXCEEDED'), /20/)
   assert.match(assetErrorMessage('QUOTA_BYTES_EXCEEDED'), /100 MB/)
   assert.match(assetErrorMessage('ASSET_STORAGE_UNAVAILABLE'), /重试/)
+  assert.match(assetErrorMessage('STALE_WORKSPACE'), /工作区/)
 })

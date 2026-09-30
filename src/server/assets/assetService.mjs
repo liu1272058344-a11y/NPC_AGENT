@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { ASSET_LIMITS, expiresAtFrom } from './config.mjs'
 import { fetchSourceImage } from './sourceImage.mjs'
 
@@ -25,17 +25,26 @@ export const createAssetService = ({ db, blob, source = fetchSourceImage, now = 
     const id = uuid()
     const createdAt = now().toISOString()
     const pathname = `workspaces/${input.workspaceId}/${id}`
-    const uploaded = await blob.putImage(pathname, image.bytes, image.contentType)
+    const usage = await db.reserveQuota(input.workspaceId, image.byteSize, ASSET_LIMITS)
+    let uploaded
     try {
+      uploaded = await blob.putImage(pathname, image.bytes, image.contentType)
       await db.upsertArchive(input.workspaceId, input.archive)
-      const promptId = input.prompt.id || `prompt-${id}`
+      const promptId = input.prompt.id || `prompt-${createHash('sha256').update(input.idempotencyKey).digest('hex').slice(0, 24)}`
       await db.insertPrompt(input.workspaceId, input.archive.id, { ...input.prompt, id: promptId })
       const record = { id, workspaceId: input.workspaceId, archiveId: input.archive.id, promptRecordId: promptId, blobUrl: uploaded.url, pathname: uploaded.pathname || pathname, contentType: image.contentType, byteSize: image.byteSize, width: image.width || input.width, height: image.height || input.height, provider: input.provider, modelId: input.modelId, createdAt, expiresAt: expiresAtFrom(now()), idempotencyKey: input.idempotencyKey }
-      const saved = await db.insertImageWithQuota(record, ASSET_LIMITS)
-      return { asset: normalizeImage(saved.record), usage: saved.usage, nearLimit: quotaWarning(saved.usage) }
-    } catch (error) { await blob.deleteImage(uploaded.url).catch(() => {}); throw error }
+      const saved = await db.insertImageAsset(record)
+      return { asset: normalizeImage(saved), usage, nearLimit: quotaWarning(usage) }
+    } catch (error) {
+      if (uploaded?.url) await blob.deleteImage(uploaded.url).catch(() => {})
+      await db.releaseQuota(input.workspaceId, image.byteSize).catch(() => {})
+      const winner = await db.findByIdempotencyKey(input.workspaceId, input.idempotencyKey).catch(() => null)
+      if (winner) { const current = await db.getWorkspaceUsage(input.workspaceId); return { asset: normalizeImage(winner), usage: current, nearLimit: quotaWarning(current) } }
+      throw error
+    }
   },
-  async listArchiveSummaries(workspaceId) { await db.ensureWorkspace(workspaceId); return { archives: (await db.listArchives(workspaceId)).map(normalizeArchive), usage: await db.getWorkspaceUsage(workspaceId) } },
+  async saveArchive(workspaceId, input) { await db.ensureWorkspace(workspaceId); const archive = await db.upsertArchive(workspaceId, input.archive); for (const prompt of input.prompts || []) await db.insertPrompt(workspaceId, input.archive.id, prompt); return { archive: normalizeArchive(archive) } },
+  async listArchiveSummaries(workspaceId, { allowCreate = false } = {}) { const exists = await db.workspaceExists(workspaceId); if (!exists && !allowCreate) throw Object.assign(new Error('当前工作区不存在，请刷新后重试。'), { code: 'STALE_WORKSPACE', statusCode: 409 }); if (!exists) await db.ensureWorkspace(workspaceId); return { archives: (await db.listArchives(workspaceId)).map(normalizeArchive), usage: await db.getWorkspaceUsage(workspaceId) } },
   async getArchiveDetail(workspaceId, archiveId) { const detail = await db.getArchiveDetail(workspaceId, archiveId); return detail ? { archive: normalizeArchive(detail.archive), prompts: detail.prompts.map(normalizePrompt), images: detail.images.map(normalizeImage) } : null },
   async getImage(workspaceId, id) { return db.findImageAsset(workspaceId, id) },
   async deleteImage(workspaceId, id) {

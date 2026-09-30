@@ -9,6 +9,12 @@ export const workspaceFrom = (headers = {}) => {
   if (!UUID.test(String(value || ''))) throw Object.assign(new Error('工作区标识无效，请刷新后重试。'), { code: 'INVALID_WORKSPACE', statusCode: 400 })
   return String(value)
 }
+export const downloadFilename = (image) => {
+  const stem = String(image.archive_name || 'generated-image').replace(/[^\p{L}\p{N}._-]+/gu, '-').replace(/-+/g, '-').replace(/^-|-$/g, '').slice(0, 60) || 'generated-image'
+  const stamp = new Date(image.created_at || image.createdAt).toISOString().replace(/[-:]/g, '').slice(0, 15).replace('T', '-')
+  const extension = String(image.content_type || image.contentType || 'image/png').split('/')[1].replace('jpeg', 'jpg')
+  return `${stem}-${stamp}.${extension}`
+}
 
 export async function createDefaultAssetService() {
   const [db, blob] = await Promise.all([createNeonAssetDatabase(), createVercelBlobStore()])
@@ -20,11 +26,12 @@ export async function handleAssetRequest(request, service) {
     const workspaceId = workspaceFrom(request.headers)
     let data
     if (request.action === 'images' && request.method === 'POST') data = await service.saveGeneratedImage({ ...request.body, workspaceId })
+    else if (request.action === 'archive' && request.method === 'POST') data = await service.saveArchive(workspaceId, request.body)
     else if (request.action === 'image' && request.method === 'DELETE') data = await service.deleteImage(workspaceId, request.id)
     else if (!request.action && request.method === 'GET' && request.query?.archiveId) {
       data = await service.getArchiveDetail(workspaceId, request.query.archiveId)
       if (!data) throw Object.assign(new Error('未找到该档案。'), { code: 'ASSET_NOT_FOUND', statusCode: 404 })
-    } else if (!request.action && request.method === 'GET') data = await service.listArchiveSummaries(workspaceId)
+    } else if (!request.action && request.method === 'GET') data = await service.listArchiveSummaries(workspaceId, { allowCreate: request.headers?.['x-workspace-create'] === '1' })
     else throw Object.assign(new Error('不支持的请求方法。'), { code: 'METHOD_NOT_ALLOWED', statusCode: 405 })
     return { status: 200, body: { ok: true, data } }
   } catch (error) { return publicError(error) }

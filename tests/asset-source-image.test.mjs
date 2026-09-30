@@ -5,9 +5,16 @@ import { fetchSourceImage, validatePublicImageUrl } from '../src/server/assets/s
 const publicDns = async () => ['93.184.216.34']
 
 test('rejects credentials and private image source destinations', async () => {
-  const blocked = ['http://user:pass@example.com/a.png', 'http://127.0.0.1/a.png', 'http://10.0.0.1/a.png', 'http://169.254.169.254/latest', 'http://[::1]/a.png']
+  const blocked = ['http://user:pass@example.com/a.png', 'http://127.0.0.1/a.png', 'http://10.0.0.1/a.png', 'http://169.254.169.254/latest', 'http://[::1]/a.png', 'http://[::ffff:127.0.0.1]/a.png', 'http://[::ffff:169.254.169.254]/latest']
   for (const value of blocked) await assert.rejects(() => validatePublicImageUrl(new URL(value), publicDns), { code: 'UNSAFE_SOURCE_URL' })
   await assert.rejects(() => validatePublicImageUrl(new URL('https://example.com/a.png'), async () => ['192.168.1.4']), { code: 'UNSAFE_SOURCE_URL' })
+})
+
+test('distinguishes terminal expiry from retryable provider failures', async () => {
+  const response = (status) => async () => new Response('no', { status })
+  await assert.rejects(() => fetchSourceImage('https://example.com/a', { resolveHost: publicDns, fetchImpl: response(404) }), { code: 'SOURCE_EXPIRED' })
+  await assert.rejects(() => fetchSourceImage('https://example.com/a', { resolveHost: publicDns, fetchImpl: response(429) }), { code: 'SOURCE_RATE_LIMITED' })
+  await assert.rejects(() => fetchSourceImage('https://example.com/a', { resolveHost: publicDns, fetchImpl: response(503) }), { code: 'SOURCE_UNAVAILABLE' })
 })
 
 test('accepts a bounded public image response', async () => {

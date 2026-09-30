@@ -2,6 +2,8 @@ CREATE TABLE IF NOT EXISTS workspaces (
   id uuid PRIMARY KEY,
   created_at timestamptz NOT NULL DEFAULT now(),
   last_seen_at timestamptz NOT NULL DEFAULT now()
+  ,image_count integer NOT NULL DEFAULT 0 CHECK (image_count >= 0)
+  ,byte_count bigint NOT NULL DEFAULT 0 CHECK (byte_count >= 0)
 );
 CREATE TABLE IF NOT EXISTS npc_archives (
   id text NOT NULL,
