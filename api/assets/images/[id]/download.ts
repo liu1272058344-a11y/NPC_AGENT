@@ -5,7 +5,7 @@ const safeName = (value: string) => value.replace(/[^\p{L}\p{N}._-]+/gu, '-').sl
 export default async function handler(req: any, res: any) {
   try {
     if (req.method !== 'GET') return res.status(405).json({ ok: false, error: { code: 'METHOD_NOT_ALLOWED', message: '仅支持下载请求。' } })
-    const workspaceId = workspaceFrom(req.headers)
+    const workspaceId = workspaceFrom({ ...req.headers, 'x-workspace-id': req.headers?.['x-workspace-id'] || req.query?.workspaceId })
     const service: any = await createDefaultAssetService()
     const image = await service.getImage(workspaceId, String(req.query?.id || ''))
     if (!image) return res.status(404).json({ ok: false, error: { code: 'ASSET_NOT_FOUND', message: '图片不存在或已过期。' } })
