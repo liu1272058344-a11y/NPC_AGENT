@@ -31,3 +31,5 @@ data/
 
 # Isolated implementation worktrees
 .worktrees/
+.vercel
+.env*
