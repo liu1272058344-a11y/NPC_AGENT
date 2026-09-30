@@ -1,4 +1,16 @@
-export const buildAssetLibraryEntries = (npc, prompts) => {
+export const createGeneratedImageAsset = (input, id = `image-${Date.now()}`) => ({
+  id,
+  url: input.url,
+  model: input.model,
+  size: input.size,
+  prompt: input.prompt,
+  negativePrompt: input.negativePrompt || '',
+  type: input.type || '生成图片',
+  sourceId: input.sourceId || '',
+  createdAt: new Date().toISOString()
+})
+
+export const buildAssetLibraryEntries = (npc, prompts, images = []) => {
   const entries = []
   if (npc) {
     entries.push({
@@ -19,11 +31,23 @@ export const buildAssetLibraryEntries = (npc, prompts) => {
       prompt
     })
   }
+  for (const image of images) {
+    entries.push({
+      id: `image:${image.id}`,
+      kind: 'image',
+      title: image.type,
+      subtitle: `${image.model} · ${image.size}`,
+      detail: '生成图片',
+      image
+    })
+  }
   return entries
 }
 
-export const buildAssetLibraryDetail = (entryId, npc, prompts) => {
+export const buildAssetLibraryDetail = (entryId, npc, prompts, images = []) => {
   if (npc && entryId === `npc:${npc.id || npc.name}`) return { kind: 'npc', npc, prompts }
   const prompt = prompts.find((item) => entryId === `prompt:${item.promptEn}`)
-  return prompt ? { kind: 'prompt', prompt } : null
+  if (prompt) return { kind: 'prompt', prompt }
+  const image = images.find((item) => entryId === `image:${item.id}`)
+  return image ? { kind: 'image', image } : null
 }

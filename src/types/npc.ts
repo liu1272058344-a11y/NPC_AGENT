@@ -47,6 +47,18 @@ export interface ArtAssetPrompt {
   negativePrompt: string
 }
 
+export interface GeneratedImageAsset {
+  id: string
+  url: string
+  model: string
+  size: string
+  prompt: string
+  negativePrompt: string
+  type: string
+  sourceId: string
+  createdAt: string
+}
+
 export interface NPCDraft {
   worldOptions: string[]
   roleOptions: string[]

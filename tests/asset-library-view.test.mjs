@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { buildAssetLibraryDetail, buildAssetLibraryEntries } from '../src/agent/assetLibraryView.mjs'
+import { buildAssetLibraryDetail, buildAssetLibraryEntries, createGeneratedImageAsset } from '../src/agent/assetLibraryView.mjs'
 
 const npc = {
   id: 'npc-1',
@@ -57,4 +57,19 @@ test('opening a prompt archive exposes that prompt without unrelated records', (
     kind: 'prompt',
     prompt
   })
+})
+
+test('generated images become local asset records that can be reopened', () => {
+  const image = createGeneratedImageAsset({
+    url: 'https://example.test/generated.png',
+    model: 'doubao-seedream-5-0-flash-260915',
+    size: '1024x1024',
+    prompt: 'cyberpunk ripperdoc',
+    negativePrompt: 'blurry',
+    type: 'NPC立绘',
+    sourceId: 'npc-1'
+  }, 'image-1')
+  assert.equal(image.id, 'image-1')
+  assert.equal(buildAssetLibraryEntries(npc, [prompt], [image])[2].kind, 'image')
+  assert.deepEqual(buildAssetLibraryDetail('image:image-1', npc, [prompt], [image]), { kind: 'image', image })
 })
