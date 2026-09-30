@@ -22,3 +22,8 @@ export const buildAssetLibraryEntries = (npc, prompts) => {
   return entries
 }
 
+export const buildAssetLibraryDetail = (entryId, npc, prompts) => {
+  if (npc && entryId === `npc:${npc.id || npc.name}`) return { kind: 'npc', npc, prompts }
+  const prompt = prompts.find((item) => entryId === `prompt:${item.promptEn}`)
+  return prompt ? { kind: 'prompt', prompt } : null
+}

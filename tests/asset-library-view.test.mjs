@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { buildAssetLibraryEntries } from '../src/agent/assetLibraryView.mjs'
+import { buildAssetLibraryDetail, buildAssetLibraryEntries } from '../src/agent/assetLibraryView.mjs'
 
 const npc = {
   id: 'npc-1',
@@ -44,3 +44,17 @@ test('asset library still shows a saved NPC when no visual prompts exist', () =>
   assert.equal(buildAssetLibraryEntries(npc, [])[0].kind, 'npc')
 })
 
+test('opening the NPC archive exposes the complete character and prompt history', () => {
+  assert.deepEqual(buildAssetLibraryDetail('npc:npc-1', npc, [prompt]), {
+    kind: 'npc',
+    npc,
+    prompts: [prompt]
+  })
+})
+
+test('opening a prompt archive exposes that prompt without unrelated records', () => {
+  assert.deepEqual(buildAssetLibraryDetail('prompt:underground cybernetic doctor', npc, [prompt]), {
+    kind: 'prompt',
+    prompt
+  })
+})

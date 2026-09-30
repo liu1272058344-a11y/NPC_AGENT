@@ -90,10 +90,19 @@
 .asset-source-summary p { margin: 8px 0 0; color: #c2cada; font-size: 12px; line-height: 1.55; }
 .library-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
 .asset-card { overflow: hidden; border: 1px solid #2c3850; border-radius: 10px; background: #182032; }
+.asset-card-button { cursor: pointer; transition: border-color .18s ease, transform .18s ease, box-shadow .18s ease; }
+.asset-card-button:hover, .asset-card-button:focus-visible { border-color: #7c5cff; box-shadow: 0 12px 28px #0004; outline: none; transform: translateY(-2px); }
 .asset-preview { display: grid; min-height: 120px; place-items: center; color: #00e5ff; background: linear-gradient(135deg, #182032, #29244e); font-size: 11px; }
 .asset-card h3, .asset-card p, .asset-card small { display: block; margin: 12px 14px 0; }
 .asset-card p, .asset-card small { color: #94a1b8; font-size: 11px; }
-.asset-card small { margin-bottom: 14px; }
+.asset-card small { margin-bottom: 10px; }
+.asset-card-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 14px 14px; color: #8d76ff; font-size: 11px; font-weight: 700; }
+.archive-detail { max-width: 1000px; }
+.prompt-history h2 { margin: 8px 0; }
+.prompt-history details { margin-top: 14px; border: 1px solid #2c3850; border-radius: 10px; background: #182032; }
+.prompt-history summary { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px; color: #fff; cursor: pointer; }
+.prompt-history summary span { color: #94a1b8; font-size: 11px; }
+.prompt-history details .npc-grid { margin: 0; padding: 16px; }
 .export-grid { display: flex; align-items: center; justify-content: space-between; gap: 24px; }
 .export-grid h3 { margin: 8px 0; }
 .export-grid p { color: #94a1b8; font-size: 12px; }
