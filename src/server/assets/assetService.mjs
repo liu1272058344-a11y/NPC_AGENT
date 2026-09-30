@@ -10,6 +10,8 @@ const normalizeImage = (row) => ({
 })
 
 const quotaWarning = (usage) => usage.imageCount >= ASSET_LIMITS.maxImages * ASSET_LIMITS.warningRatio || usage.byteCount >= ASSET_LIMITS.maxBytes * ASSET_LIMITS.warningRatio
+const normalizeArchive = (row) => ({ id: row.id, name: row.name, summary: row.summary, profile: row.profile || row.profile_json, imageCount: Number(row.imageCount || row.image_count || 0), byteCount: Number(row.byteCount || row.byte_count || 0), coverUrl: row.coverUrl || row.cover_url || undefined, nearestExpiry: row.nearestExpiry || row.nearest_expiry || undefined })
+const normalizePrompt = (row) => ({ id: row.id, prompt: row.prompt, negativePrompt: row.negativePrompt || row.negative_prompt || '', provider: row.provider, modelId: row.modelId || row.model_id, createdAt: row.createdAt || row.created_at })
 
 export const createAssetService = ({ db, blob, source = fetchSourceImage, now = () => new Date(), uuid = randomUUID }) => ({
   async saveGeneratedImage(input) {
@@ -33,8 +35,8 @@ export const createAssetService = ({ db, blob, source = fetchSourceImage, now = 
       return { asset: normalizeImage(saved.record), usage: saved.usage, nearLimit: quotaWarning(saved.usage) }
     } catch (error) { await blob.deleteImage(uploaded.url).catch(() => {}); throw error }
   },
-  async listArchiveSummaries(workspaceId) { await db.ensureWorkspace(workspaceId); return { archives: await db.listArchives(workspaceId), usage: await db.getWorkspaceUsage(workspaceId) } },
-  async getArchiveDetail(workspaceId, archiveId) { return db.getArchiveDetail(workspaceId, archiveId) },
+  async listArchiveSummaries(workspaceId) { await db.ensureWorkspace(workspaceId); return { archives: (await db.listArchives(workspaceId)).map(normalizeArchive), usage: await db.getWorkspaceUsage(workspaceId) } },
+  async getArchiveDetail(workspaceId, archiveId) { const detail = await db.getArchiveDetail(workspaceId, archiveId); return detail ? { archive: normalizeArchive(detail.archive), prompts: detail.prompts.map(normalizePrompt), images: detail.images.map(normalizeImage) } : null },
   async getImage(workspaceId, id) { return db.findImageAsset(workspaceId, id) },
   async deleteImage(workspaceId, id) {
     const image = await db.findImageAsset(workspaceId, id)
