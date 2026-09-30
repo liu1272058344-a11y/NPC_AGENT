@@ -11,6 +11,21 @@ export const createAssetDatabase = (query) => ({
     VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT (id) DO UPDATE SET prompt=EXCLUDED.prompt RETURNING *`, [prompt.id, workspaceId, archiveId, prompt.prompt, prompt.negativePrompt || '', prompt.provider || '', prompt.modelId || ''])).rows[0],
   insertImageAsset: async (record) => (await query(`INSERT INTO image_assets (id,workspace_id,archive_id,prompt_record_id,blob_url,pathname,content_type,byte_size,width,height,provider,model_id,created_at,expires_at,idempotency_key)
     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`, [record.id, record.workspaceId, record.archiveId, record.promptRecordId, record.blobUrl, record.pathname, record.contentType, record.byteSize, record.width || null, record.height || null, record.provider, record.modelId, record.createdAt, record.expiresAt, record.idempotencyKey])).rows[0],
+  insertImageWithQuota: async (record, limits) => {
+    const result = await query(`WITH locked AS (SELECT pg_advisory_xact_lock(hashtext($2))), current_usage AS (
+      SELECT COUNT(*)::int AS image_count, COALESCE(SUM(byte_size),0)::bigint AS byte_count FROM image_assets, locked WHERE workspace_id=$2
+    ), inserted AS (
+      INSERT INTO image_assets (id,workspace_id,archive_id,prompt_record_id,blob_url,pathname,content_type,byte_size,width,height,provider,model_id,created_at,expires_at,idempotency_key)
+      SELECT $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15 FROM current_usage
+      WHERE image_count < $16 AND byte_count + $8 <= $17 RETURNING *
+    ) SELECT inserted.*, current_usage.image_count, current_usage.byte_count FROM current_usage LEFT JOIN inserted ON true`, [record.id, record.workspaceId, record.archiveId, record.promptRecordId, record.blobUrl, record.pathname, record.contentType, record.byteSize, record.width || null, record.height || null, record.provider, record.modelId, record.createdAt, record.expiresAt, record.idempotencyKey, limits.maxImages, limits.maxBytes])
+    const row = result.rows[0]
+    if (!row?.id) {
+      const code = Number(row?.image_count || 0) >= limits.maxImages ? 'QUOTA_COUNT_EXCEEDED' : 'QUOTA_BYTES_EXCEEDED'
+      throw Object.assign(new Error(code === 'QUOTA_COUNT_EXCEEDED' ? '图片数量已达到上限。' : '图片存储容量已达到上限。'), { code, statusCode: 409 })
+    }
+    return { record: row, usage: { imageCount: Number(row.image_count) + 1, byteCount: Number(row.byte_count) + record.byteSize } }
+  },
   findByIdempotencyKey: async (workspaceId, key) => (await query('SELECT * FROM image_assets WHERE workspace_id=$1 AND idempotency_key=$2', [workspaceId, key])).rows[0] || null,
   listArchives: async (workspaceId) => (await query(`SELECT a.*, COUNT(i.id)::int AS image_count, COALESCE(SUM(i.byte_size),0)::bigint AS byte_count,
     (ARRAY_AGG(i.blob_url ORDER BY i.created_at DESC) FILTER (WHERE i.id IS NOT NULL))[1] AS cover_url,
