@@ -35,6 +35,7 @@ export const createAssetService = ({ db, blob, source = fetchSourceImage, now = 
   },
   async listArchiveSummaries(workspaceId) { await db.ensureWorkspace(workspaceId); return { archives: await db.listArchives(workspaceId), usage: await db.getWorkspaceUsage(workspaceId) } },
   async getArchiveDetail(workspaceId, archiveId) { return db.getArchiveDetail(workspaceId, archiveId) },
+  async getImage(workspaceId, id) { return db.findImageAsset(workspaceId, id) },
   async deleteImage(workspaceId, id) {
     const image = await db.findImageAsset(workspaceId, id)
     if (!image) return { deleted: true }
