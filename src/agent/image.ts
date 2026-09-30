@@ -13,7 +13,10 @@ export async function generateImage(prompt: string, negativePrompt = '', apiKey 
     : provider === 'together'
       ? { url: `${endpoint}/images/generations`, headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' }, body: { model, prompt, width: 1024, height: 1024, steps: 4, n: 1 } }
       : { url: `${endpoint}/images/generations`, headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' }, body: { model, prompt: negativePrompt ? `${prompt}\nAvoid: ${negativePrompt}` : prompt, size, n: 1 } }
-  const response = await fetch(request.url, { method: 'POST', headers: request.headers, body: JSON.stringify(request.body) })
+  const finalRequest = provider === 'volcengine'
+    ? { url: '/api/image', headers: { 'Content-Type': 'application/json' }, body: { provider, prompt, negativePrompt, apiKey, endpoint, model, size } }
+    : request
+  const response = await fetch(finalRequest.url, { method: 'POST', headers: finalRequest.headers, body: JSON.stringify(finalRequest.body) })
   const body = await response.json()
   if (!response.ok) throw new Error(body.error?.message || body.detail || body.message || '图像生成失败')
   const image = body.data?.[0] || body.images?.[0] || body
