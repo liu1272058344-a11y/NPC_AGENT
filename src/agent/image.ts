@@ -7,14 +7,14 @@ export async function generateImage(prompt: string, negativePrompt = '', apiKey 
   const size = options.size || '1024x1024'
   const endpoint = (options.endpoint || 'https://api.openai.com/v1').replace(/\/$/, '')
   const request = provider === 'volcengine'
-    ? { url: `${endpoint}/api/v3/images/generations`, headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' }, body: { model, prompt, response_format: 'url', size } }
+    ? { url: `${endpoint}/api/v3/images/generations`, headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' }, body: { model, prompt, response_format: 'url', size, watermark: false } }
     : provider === 'fal'
     ? { url: `${endpoint}/fal-ai/${model}`, headers: { Authorization: `Key ${apiKey}`, 'Content-Type': 'application/json' }, body: { prompt, image_size: size } }
     : provider === 'together'
       ? { url: `${endpoint}/images/generations`, headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' }, body: { model, prompt, width: 1024, height: 1024, steps: 4, n: 1 } }
       : { url: `${endpoint}/images/generations`, headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' }, body: { model, prompt: negativePrompt ? `${prompt}\nAvoid: ${negativePrompt}` : prompt, size, n: 1 } }
   const finalRequest = provider === 'volcengine'
-    ? { url: '/api/image', headers: { 'Content-Type': 'application/json' }, body: { provider, prompt, negativePrompt, apiKey, endpoint, model, size } }
+    ? { url: '/api/image', headers: { 'Content-Type': 'application/json' }, body: { provider, prompt, negativePrompt, apiKey, endpoint, model, size, watermark: false } }
     : request
   const response = await fetch(finalRequest.url, { method: 'POST', headers: finalRequest.headers, body: JSON.stringify(finalRequest.body) })
   const raw = await response.text()
