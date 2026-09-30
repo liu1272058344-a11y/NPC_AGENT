@@ -47,6 +47,17 @@ export const createAssetService = ({ db, blob, source = fetchSourceImage, now = 
   async listArchiveSummaries(workspaceId, { allowCreate = false } = {}) { const exists = await db.workspaceExists(workspaceId); if (!exists && !allowCreate) throw Object.assign(new Error('当前工作区不存在，请刷新后重试。'), { code: 'STALE_WORKSPACE', statusCode: 409 }); if (!exists) await db.ensureWorkspace(workspaceId); return { archives: (await db.listArchives(workspaceId)).map(normalizeArchive), usage: await db.getWorkspaceUsage(workspaceId) } },
   async getArchiveDetail(workspaceId, archiveId) { const detail = await db.getArchiveDetail(workspaceId, archiveId); return detail ? { archive: normalizeArchive(detail.archive), prompts: detail.prompts.map(normalizePrompt), images: detail.images.map(normalizeImage) } : null },
   async getImage(workspaceId, id) { return db.findImageAsset(workspaceId, id) },
+  async deleteArchive(workspaceId, id) {
+    if (typeof id !== 'string' || !id.trim()) throw Object.assign(new Error('档案标识无效。'), { statusCode: 400 })
+    const detail = await db.getArchiveDetail(workspaceId, id)
+    if (!detail) return { deleted: true }
+    for (const image of detail.images) {
+      await blob.deleteImage(image.blob_url || image.url).catch((error) => { if (error?.statusCode !== 404) throw error })
+      await db.deleteImageRecord(workspaceId, image.id)
+    }
+    await db.deleteEmptyArchive(workspaceId, id)
+    return { deleted: true }
+  },
   async deleteImage(workspaceId, id) {
     const image = await db.findImageAsset(workspaceId, id)
     if (!image) return { deleted: true }

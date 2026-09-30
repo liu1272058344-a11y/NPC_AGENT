@@ -6,6 +6,10 @@ export const createAssetDatabase = (query) => ({
     VALUES ($1,$2,$3,$4,$5::jsonb) ON CONFLICT (workspace_id,id) DO UPDATE SET name=$3, summary=$4, profile_json=$5::jsonb, updated_at=NOW()
     RETURNING *`, [archive.id, workspaceId, archive.name, archive.summary || '', JSON.stringify(archive.profile || archive)])).rows[0],
   workspaceExists: async (workspaceId) => Boolean((await query('SELECT 1 FROM workspaces WHERE id=$1', [workspaceId])).rowCount),
+  deleteEmptyArchive: async (workspaceId, id) => {
+    await query('DELETE FROM npc_archives WHERE workspace_id=$1 AND id=$2 AND NOT EXISTS (SELECT 1 FROM image_assets WHERE workspace_id=$1 AND archive_id=$2)', [workspaceId, id])
+    if ((await query('SELECT 1 FROM npc_archives WHERE workspace_id=$1 AND id=$2', [workspaceId, id])).rowCount) throw Object.assign(new Error('档案仍有图片正在保存，请稍后重试删除。'), { statusCode: 409 })
+  },
   getWorkspaceUsage: async (workspaceId) => usage((await query('SELECT image_count, byte_count FROM workspaces WHERE id=$1', [workspaceId])).rows[0]),
   reserveQuota: async (workspaceId, byteSize, limits) => {
     const result = await query(`UPDATE workspaces SET image_count=image_count+1, byte_count=byte_count+$2, last_seen_at=NOW()

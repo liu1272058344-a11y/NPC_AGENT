@@ -27,6 +27,7 @@ export async function handleAssetRequest(request, service) {
     let data
     if (request.action === 'images' && request.method === 'POST') data = await service.saveGeneratedImage({ ...request.body, workspaceId })
     else if (request.action === 'archive' && request.method === 'POST') data = await service.saveArchive(workspaceId, request.body)
+    else if (request.action === 'archive' && request.method === 'DELETE') data = await service.deleteArchive(workspaceId, request.body?.id)
     else if (request.action === 'image' && request.method === 'DELETE') data = await service.deleteImage(workspaceId, request.id)
     else if (!request.action && request.method === 'GET' && request.query?.archiveId) {
       data = await service.getArchiveDetail(workspaceId, request.query.archiveId)

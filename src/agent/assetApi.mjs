@@ -32,6 +32,7 @@ export const createAssetApi = ({ workspaceId = getWorkspaceId(), fetchImpl = fet
     saveRemoteImage: (input) => request('/api/assets/images', { method: 'POST', body: JSON.stringify(input) }),
     saveRemoteArchive: (input) => request('/api/assets/archive', { method: 'POST', body: JSON.stringify(input) }),
     deleteRemoteImage: (id) => request(`/api/assets/images/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+    deleteRemoteArchive: (id) => request('/api/assets/archive', { method: 'DELETE', body: JSON.stringify({ id }) }),
     getRemoteImageDownloadUrl: (id) => `/api/assets/images/${encodeURIComponent(id)}/download?workspaceId=${encodeURIComponent(workspaceId)}`,
     workspaceId
   }
