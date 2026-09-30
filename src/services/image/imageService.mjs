@@ -1,8 +1,9 @@
 import * as openai from './providers/openaiProvider.mjs'
 import * as flux from './providers/fluxProvider.mjs'
 import * as stableDiffusion from './providers/stableDiffusionProvider.mjs'
+import * as volcengine from './providers/volcengineProvider.mjs'
 
-const providers = { openai, flux, 'stable-diffusion': stableDiffusion, stableDiffusion }
+const providers = { openai, flux, 'stable-diffusion': stableDiffusion, stableDiffusion, volcengine }
 
 export async function generateImage({ prompt, negativePrompt = '', apiKey, provider = 'openai', endpoint, model = 'gpt-image-1', size = '1024x1024' }) {
   if (!prompt?.trim()) throw Object.assign(new Error('image prompt is required'), { code: 'IMAGE_PROVIDER_ERROR', statusCode: 400 })
