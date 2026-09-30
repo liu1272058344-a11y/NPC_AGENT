@@ -28,3 +28,6 @@ __pycache__/
 
 # Runtime persistence (local SQLite databases)
 data/
+
+# Isolated implementation worktrees
+.worktrees/
