@@ -12,15 +12,27 @@ export const createAssetDatabase = (query) => ({
   },
   getWorkspaceUsage: async (workspaceId) => usage((await query('SELECT image_count, byte_count FROM workspaces WHERE id=$1', [workspaceId])).rows[0]),
   reserveQuota: async (workspaceId, byteSize, limits) => {
-    const result = await query(`UPDATE workspaces SET image_count=image_count+1, byte_count=byte_count+$2, last_seen_at=NOW()
-      WHERE id=$1 AND image_count < $3 AND byte_count + $2 <= $4 RETURNING image_count, byte_count`, [workspaceId, byteSize, limits.maxImages, limits.maxBytes])
+    const result = await query(`WITH locked AS (SELECT pg_advisory_xact_lock(hashtext('internal_beta_project_usage'))), current AS (
+      SELECT w.id, w.image_count, w.byte_count, p.image_count AS project_images, p.byte_count AS project_bytes
+      FROM workspaces w CROSS JOIN internal_beta_project_usage p CROSS JOIN locked WHERE w.id=$1 AND p.id=1 FOR UPDATE
+    ), project_update AS (
+      UPDATE internal_beta_project_usage p SET image_count=p.image_count+1, byte_count=p.byte_count+$2
+      FROM current c WHERE p.id=1 AND c.image_count < $3 AND c.byte_count+$2 <= $4
+        AND c.project_images < $5 AND c.project_bytes+$2 <= $6 RETURNING p.id
+    ) UPDATE workspaces w SET image_count=w.image_count+1, byte_count=w.byte_count+$2, last_seen_at=NOW()
+      FROM current c, project_update p WHERE w.id=c.id RETURNING w.image_count, w.byte_count`, [workspaceId, byteSize, limits.maxImages, limits.maxBytes, limits.projectMaxImages, limits.projectMaxBytes])
     if (result.rows[0]) return usage(result.rows[0])
     const current = await query('SELECT image_count, byte_count FROM workspaces WHERE id=$1', [workspaceId])
     const value = usage(current.rows[0])
+    const project = await query('SELECT image_count, byte_count FROM internal_beta_project_usage WHERE id=1', [])
+    const projectUsage = usage(project.rows[0])
+    if (projectUsage.imageCount >= limits.projectMaxImages || projectUsage.byteCount + byteSize > limits.projectMaxBytes) throw Object.assign(new Error('项目资产总额度已达到上限。'), { code: 'PROJECT_ASSET_LIMIT_REACHED', statusCode: 429 })
     const code = value.imageCount >= limits.maxImages ? 'QUOTA_COUNT_EXCEEDED' : 'QUOTA_BYTES_EXCEEDED'
     throw Object.assign(new Error(code === 'QUOTA_COUNT_EXCEEDED' ? '图片数量已达到上限。' : '图片存储容量已达到上限。'), { code, statusCode: 409 })
   },
-  releaseQuota: async (workspaceId, byteSize) => query('UPDATE workspaces SET image_count=GREATEST(0,image_count-1), byte_count=GREATEST(0,byte_count-$2) WHERE id=$1', [workspaceId, byteSize]),
+  releaseQuota: async (workspaceId, byteSize) => query(`WITH project_update AS (
+      UPDATE internal_beta_project_usage SET image_count=GREATEST(0,image_count-1), byte_count=GREATEST(0,byte_count-$2) WHERE id=1
+    ) UPDATE workspaces SET image_count=GREATEST(0,image_count-1), byte_count=GREATEST(0,byte_count-$2) WHERE id=$1`, [workspaceId, byteSize]),
   reserveUsage: async (workspaceId) => usage((await query(`SELECT COUNT(i.id) AS image_count, COALESCE(SUM(i.byte_size),0) AS byte_count FROM workspaces w LEFT JOIN image_assets i ON i.workspace_id=w.id WHERE w.id=$1 GROUP BY w.id FOR UPDATE`, [workspaceId])).rows[0]),
   insertPrompt: async (workspaceId, archiveId, prompt) => (await query(`INSERT INTO prompt_records (id,workspace_id,archive_id,prompt,negative_prompt,provider,model_id)
     VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT (workspace_id,id) DO UPDATE SET prompt=EXCLUDED.prompt RETURNING *`, [prompt.id, workspaceId, archiveId, prompt.prompt, prompt.negativePrompt || '', prompt.provider || '', prompt.modelId || ''])).rows[0],
@@ -53,8 +65,14 @@ export const createAssetDatabase = (query) => ({
     return { archive, prompts, images }
   },
   findImageAsset: async (workspaceId, id) => (await query('SELECT i.*, a.name AS archive_name FROM image_assets i JOIN npc_archives a ON a.workspace_id=i.workspace_id AND a.id=i.archive_id WHERE i.workspace_id=$1 AND i.id=$2', [workspaceId, id])).rows[0] || null,
-  deleteImageRecord: async (workspaceId, id) => query(`WITH deleted AS (DELETE FROM image_assets WHERE workspace_id=$1 AND id=$2 RETURNING byte_size)
-    UPDATE workspaces SET image_count=GREATEST(0,image_count-(SELECT COUNT(*) FROM deleted)), byte_count=GREATEST(0,byte_count-COALESCE((SELECT SUM(byte_size) FROM deleted),0)) WHERE id=$1`, [workspaceId, id]),
+  deleteImageRecord: async (workspaceId, id) => query(`WITH deleted AS (
+      DELETE FROM image_assets WHERE workspace_id=$1 AND id=$2 RETURNING byte_size
+    ), project_update AS (
+      UPDATE internal_beta_project_usage SET image_count=GREATEST(0,image_count-(SELECT COUNT(*) FROM deleted)),
+        byte_count=GREATEST(0,byte_count-COALESCE((SELECT SUM(byte_size) FROM deleted),0)) WHERE id=1 RETURNING id
+    ) UPDATE workspaces SET image_count=GREATEST(0,image_count-(SELECT COUNT(*) FROM deleted)),
+      byte_count=GREATEST(0,byte_count-COALESCE((SELECT SUM(byte_size) FROM deleted),0))
+      FROM project_update WHERE workspaces.id=$1`, [workspaceId, id]),
   listExpiredImages: async (before, limit = 100) => (await query('SELECT * FROM image_assets WHERE expires_at <= $1 ORDER BY expires_at LIMIT $2', [before, limit])).rows
 })
 

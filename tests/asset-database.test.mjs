@@ -4,8 +4,8 @@ import { ASSET_LIMITS, expiresAtFrom } from '../src/server/assets/config.mjs'
 import { createAssetDatabase, createNeonQueryAdapter } from '../src/server/assets/database.mjs'
 import { readFile } from 'node:fs/promises'
 
-test('remote asset limits are fixed by the product policy', () => {
-  assert.deepEqual(ASSET_LIMITS, { maxImages: 20, maxBytes: 100 * 1024 * 1024, retentionDays: 30, warningRatio: 0.8, maxSourceBytes: 20 * 1024 * 1024, sourceTimeoutMs: 15000 })
+test('remote asset limits include workspace and project hard ceilings', () => {
+  assert.deepEqual(ASSET_LIMITS, { maxImages: 20, maxBytes: 100 * 1024 * 1024, projectMaxImages: 200, projectMaxBytes: 1024 * 1024 * 1024, retentionDays: 30, warningRatio: 0.8, maxSourceBytes: 20 * 1024 * 1024, sourceTimeoutMs: 15000 })
   assert.equal(expiresAtFrom(new Date('2026-09-30T00:00:00Z')), '2026-10-30T00:00:00.000Z')
 })
 
@@ -48,6 +48,17 @@ test('reserves and releases quota with atomic workspace counters', async () => {
   assert.deepEqual(await db.reserveQuota('w1', 100, { maxImages: 20, maxBytes: 104857600 }), { imageCount: 2, byteCount: 300 })
   await db.releaseQuota('w1', 100)
   assert.match(calls[0], /UPDATE workspaces/)
-  assert.match(calls[0], /image_count < \$3/)
-  assert.match(calls[1], /GREATEST/)
+  assert.match(calls[0], /internal_beta_project_usage/)
+  assert.match(calls[0], /project_images < \$5/)
+  assert.match(calls[0], /project_bytes\+\$2 <= \$6/)
+  assert.match(calls[1], /internal_beta_project_usage/)
+})
+
+test('deleting an image releases both workspace and project usage', async () => {
+  const calls = []
+  const db = createAssetDatabase(async (text, values) => { calls.push({ text, values }); return { rows: [], rowCount: 1 } })
+  await db.deleteImageRecord('w1', 'image-1')
+  assert.match(calls[0].text, /internal_beta_project_usage/)
+  assert.match(calls[0].text, /SUM\(byte_size\)/)
+  assert.deepEqual(calls[0].values, ['w1', 'image-1'])
 })

@@ -15,6 +15,7 @@ import { ImageViewer } from './components/ImageViewer'
 import { ArchiveDetailView } from './components/ArchiveDetail'
 import { migrateLocalAssetRecords } from './agent/assetMigration.mjs'
 import { assetGenerationButton, characterArchiveStatus } from './agent/generationView.mjs'
+import { InternalBetaGate } from './components/InternalBetaGate'
 
 const navItems = ['Project Overview', 'Game Design', 'World Builder', 'Character Studio', 'Visual Production', 'Image Generation', 'Asset Library', 'Export Center', 'Settings']
 const navLabels: Record<string, string> = { 'Project Overview': '项目总览', 'Game Design': '游戏设定', 'World Builder': '世界构建', 'Character Studio': '角色工作室', 'Visual Production': '美术生产', 'Image Generation': '文生图工作台', 'Asset Library': '资产库', 'Export Center': '导出中心', Settings: '设置' }
@@ -27,7 +28,7 @@ const normalizeWorld = (value: WorldProfile): WorldProfile => ({ name: toText(va
 const readSavedNPC = (): NPC | null => { try { const saved = localStorage.getItem('npc-forge-current-npc'); if (!saved) return null; return normalizeNPC(JSON.parse(saved) as NPC) } catch { localStorage.removeItem('npc-forge-current-npc'); return null } }
 const readSavedAssets = (): ArtAssetPrompt[] => { try { const saved = localStorage.getItem('npc-forge-asset-library'); return saved ? JSON.parse(saved) as ArtAssetPrompt[] : [] } catch { return [] } }
 
-function App() {
+function AppContent() {
   const [active, setActive] = useState('Overview')
   const [description, setDescription] = useState('')
   const [npc, setNpc] = useState<NPC | null>(readSavedNPC)
@@ -183,4 +184,5 @@ function App() {
   const page = active === 'Project Overview' ? overview : active === 'Game Design' ? gameDesign : active === 'World Builder' ? creation : active === 'Character Studio' ? studio : active === 'Visual Production' ? assetPage : active === 'Image Generation' ? imageStudio : active === 'Asset Library' ? libraryPage : active === 'Export Center' ? exportPage : active === 'Settings' ? <>{settings}{imageSettings}</> : overview
   return <div className="app-shell"><aside className="sidebar"><div className="brand">AI GAME<br />CONTENT PIPELINE</div><div className="product-label">AI 游戏内容生产智能体</div><nav className="nav-list" aria-label="主导航">{navItems.map((item) => <button className={`nav-item ${active === item ? 'is-active' : ''}`} key={item} type="button" onClick={() => setActive(item)}>{navLabels[item]}</button>)}</nav><div className="version">v0.2 PIPELINE</div></aside><main className="main-area"><header className="topbar"><h1>{navLabels[active]}</h1><span className="search-hint">AI Game Content Pipeline Agent</span></header><div className="content">{migrationNotice && <div className="migration-notice">{migrationNotice}<button type="button" onClick={() => setMigrationNotice('')}>关闭</button></div>}{page}</div></main>{viewerImage && <ImageViewer image={viewerImage.image} downloadUrl={viewerImage.downloadUrl} onClose={() => setViewerImage(null)} />}</div>
 }
+function App() { return <InternalBetaGate><AppContent /></InternalBetaGate> }
 export default App

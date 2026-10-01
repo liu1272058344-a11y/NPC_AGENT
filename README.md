@@ -42,3 +42,19 @@ If you are developing a production application, we recommend enabling type-aware
 ```
 
 See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+# 内测访问与免费额度保护
+
+生产部署默认采用应用层内测口令保护。部署前必须在 Vercel 配置以下环境变量：
+
+- `INTERNAL_BETA_PASSWORD`：普通测试者共用口令，至少 12 位随机字符。
+- `INTERNAL_BETA_ADMIN_PASSWORD`：独立管理员口令，至少 12 位且不得与测试口令相同。
+- `INTERNAL_BETA_SESSION_SECRET`：至少 32 位的随机会话签名密钥。
+- `INTERNAL_BETA_MAX_IMAGES`：项目图片硬上限，默认 `200`。
+- `INTERNAL_BETA_MAX_BYTES`：项目 Blob 字节硬上限，默认 `1073741824`（1 GiB）。
+- `INTERNAL_BETA_DAILY_ACTIONS`：全项目每日成本操作熔断值，默认 `30`。
+
+首次部署前在 Neon 执行 `db/migrations/002_internal_beta_guardrails.sql`。未应用迁移时，成本操作会失败关闭，不会绕过额度继续调用上游服务。
+
+该机制不限制每分钟请求数或并发数，也不会改写 Prompt、切换模型、减少审查轮次、降低图片分辨率或压缩图片。达到每日或存储硬上限后，会直接拒绝新的成本操作；读取、下载和删除仍可继续。
+
+管理员登录后可在页面右下角查看应用内总用量。平台级用量仍应定期在 Vercel Usage 和 Neon 控制台检查。轮换口令时更新对应环境变量并重新部署；轮换 `INTERNAL_BETA_SESSION_SECRET` 会立即使全部旧会话失效。

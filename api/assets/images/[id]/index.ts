@@ -1,6 +1,8 @@
 import { createDefaultAssetService, handleAssetRequest, sendResult } from '../../../../src/server/assets/http.mjs'
+import { guardVercelRequest } from '../../../../src/server/internalBeta/guard.mjs'
 
 export default async function handler(req: any, res: any) {
+  if (!await guardVercelRequest(req, res)) return
   try {
     const service = await createDefaultAssetService()
     return sendResult(res, await handleAssetRequest({ method: req.method, action: 'image', id: String(req.query?.id || ''), headers: req.headers }, service))

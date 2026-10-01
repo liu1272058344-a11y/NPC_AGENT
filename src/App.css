@@ -144,3 +144,12 @@
 .asset-delete { color: #ffaaaa; border-color: #884b59; }
 .asset-delete:hover { background: #522839; }
 .asset-delete:disabled { opacity: .5; cursor: wait; }
+.beta-login { min-height: 100vh; display: grid; place-items: center; padding: 24px; background: radial-gradient(circle at top, #18233d, #080b12 65%); }
+.beta-login-card { width: min(440px, 100%); display: grid; gap: 18px; padding: 32px; border: 1px solid rgba(125, 161, 255, .25); border-radius: 18px; background: rgba(13, 19, 32, .96); box-shadow: 0 24px 80px rgba(0, 0, 0, .45); }
+.beta-login-card h1, .beta-login-card p { margin: 0; }
+.beta-login-card label { display: grid; gap: 8px; }
+.beta-login-card input { width: 100%; box-sizing: border-box; }
+.beta-usage { position: fixed; z-index: 20; right: 18px; bottom: 18px; display: grid; gap: 4px; max-width: min(520px, calc(100vw - 36px)); padding: 12px 16px; border: 1px solid rgba(97, 211, 167, .45); border-radius: 12px; color: #d9fff0; background: rgba(9, 25, 23, .94); box-shadow: 0 10px 35px rgba(0, 0, 0, .35); font-size: 13px; }
+.beta-usage.beta-warning { border-color: rgba(250, 199, 90, .7); color: #ffeab6; background: rgba(42, 31, 9, .95); }
+.beta-usage.beta-risk { border-color: rgba(255, 101, 122, .75); color: #ffd5dc; background: rgba(45, 12, 20, .96); }
+.beta-logout { position: fixed; z-index: 21; top: 14px; right: 18px; padding: 7px 12px; border: 1px solid rgba(255,255,255,.16); border-radius: 9px; color: #d9e2f5; background: rgba(12,18,30,.86); cursor: pointer; }

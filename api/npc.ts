@@ -78,6 +78,7 @@ const publicReply = (value: unknown, action: unknown) => {
 }
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' })
+  if (!await guardVercelRequest(req, res, { costKind: 'npc' })) return
   res.setHeader('Cache-Control', 'no-store')
   const body = req.body || {}
   let sessionKey: string
@@ -106,3 +107,4 @@ import { runNpcRequest } from '../src/server/npcWorkflow.mjs'
 import { toPublicError } from '../src/server/errors.mjs'
 import { withRequestId } from '../src/server/httpResponse.mjs'
 import { normalizeAssetType } from '../src/server/assetType.mjs'
+import { guardVercelRequest } from '../src/server/internalBeta/guard.mjs'
