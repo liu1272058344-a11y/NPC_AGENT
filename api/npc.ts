@@ -88,7 +88,7 @@ export default async function handler(req: any, res: any) {
       const provider = body.provider === 'deepseek' ? 'deepseek' : 'openai'
       const key = sessionKey
       const result = await runNpcRequest({ messages: body.messages, world: body.world, contentProfile: body.contentProfile, phase: body.phase || 'world', model: body.model || (provider === 'deepseek' ? process.env.DEEPSEEK_MODEL || 'deepseek-chat' : process.env.OPENAI_MODEL || 'gpt-5'), provider, key, requestId: body.requestId })
-      return res.status(200).json(result)
+      return res.status(200).json(withRequestId(result, typeof body.requestId === 'string' ? body.requestId : undefined))
     } catch (error) {
       const requestId = typeof body.requestId === 'string' ? body.requestId : 'unknown'
       const publicError = toPublicError(error, requestId)
@@ -104,3 +104,4 @@ export default async function handler(req: any, res: any) {
 }
 import { runNpcRequest } from '../src/server/npcWorkflow.mjs'
 import { toPublicError } from '../src/server/errors.mjs'
+import { withRequestId } from '../src/server/httpResponse.mjs'

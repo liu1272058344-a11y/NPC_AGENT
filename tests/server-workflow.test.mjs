@@ -4,11 +4,19 @@ import { runNpcRequest } from '../src/server/npcWorkflow.mjs'
 
 const world = { name: '灰烬边城', genre: '末日废土', era: '灾变后', atmosphere: '危险', coreRule: '配给', centralConflict: '争夺物资', summary: '幸存者寻找秩序' }
 
-test('workflow rejects a response that contains no world schema instead of trusting a model status', async () => {
+test('workflow rejects a finalized response that contains no world schema with validation status', async () => {
   let instructions = ''
-  await assert.rejects(runNpcRequest({ phase: 'world', messages: [{ role: 'user', content: '做一个世界' }], provider: 'deepseek', model: 'deepseek-chat', key: 'k' }, { requestStructured: async (request) => { instructions = request.instructions; return { question: '请补充类型', options: ['末日'] } } }), (error) => error.code === 'INVALID_SCHEMA')
+  await assert.rejects(runNpcRequest({ phase: 'world', messages: [{ role: 'user', content: '做一个世界' }], provider: 'deepseek', model: 'deepseek-chat', key: 'k' }, { requestStructured: async (request) => { instructions = request.instructions; return { status: 'world_ready', phase: 'world' } } }), (error) => error.code === 'INVALID_SCHEMA' && error.statusCode === 422)
   assert.match(instructions, /JSON/)
-  assert.match(instructions, /world schema JSON/)
+  assert.match(instructions, /needs_clarification/)
+})
+
+test('workflow returns a world clarification without entering finalized-world validation', async () => {
+  const result = await runNpcRequest(
+    { phase: 'world', messages: [{ role: 'user', content: '嗯。' }], provider: 'deepseek', model: 'deepseek-chat', key: 'k' },
+    { requestStructured: async () => ({ status: 'needs_clarification', phase: 'world', question: '你想做什么类型的游戏？', options: ['角色扮演', '冒险'] }) }
+  )
+  assert.deepEqual(result, { status: 'needs_clarification', phase: 'world', question: '你想做什么类型的游戏？', options: ['角色扮演', '冒险'] })
 })
 
 test('workflow returns only a validated world or NPC result', async () => {
