@@ -113,10 +113,11 @@ test('configured provider requests go through the NPC Forge backend contract', a
   try {
     agent.setAgentConfig({ provider: 'deepseek', endpoint: 'http://localhost:8787/api/npc', model: 'deepseek-chat', apiKey: 'fixture-key' })
     await agent.createNPC([{ role: 'user', content: '我想做一个 NPC' }])
-    assert.equal(calls[0].input, 'http://localhost:8787/api/npc')
+    assert.equal(calls[0].input, '/api/npc')
     const payload = JSON.parse(calls[0].init.body)
     assert.equal(payload.provider, 'deepseek')
-    assert.equal(payload.apiKey, 'fixture-key')
+    assert.equal(payload.apiKey, undefined)
+    assert.equal(calls[0].init.body.includes('fixture-key'), false)
   } finally { globalThis.fetch = originalFetch }
 })
 

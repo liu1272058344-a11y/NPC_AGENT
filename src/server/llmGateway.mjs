@@ -62,11 +62,11 @@ export async function requestStructured({ provider, key, model, messages = [], i
       const rawResponse = jsonText(payload, mode)
       let value
       try { value = parseJson(rawResponse) } catch (parseError) {
-        logger({ requestId, provider, model, attempt, durationMs: Date.now() - started, rawResponse, finishReason: payload.choices?.[0]?.finish_reason || payload.status, usage: payload.usage, errorCode: parseError.code, retrying: attempt < 3 })
+        logger({ requestId, provider, model, attempt, durationMs: Date.now() - started, finishReason: payload.choices?.[0]?.finish_reason || payload.status, usage: payload.usage, errorCode: parseError.code, retrying: attempt < 3 })
         if (parseError.code === 'EMPTY_RESPONSE' || attempt >= 3) throw parseError
         throw parseError
       }
-      logger({ requestId, provider, model, attempt, durationMs: Date.now() - started, rawResponse, finishReason: payload.choices?.[0]?.finish_reason || payload.status, usage: payload.usage, parsedJson: value, retrying: false })
+      logger({ requestId, provider, model, attempt, durationMs: Date.now() - started, finishReason: payload.choices?.[0]?.finish_reason || payload.status, usage: payload.usage, retrying: false })
       return value
     } catch (error) {
       if (signal?.aborted) throw new GatewayError('REQUEST_ABORTED', '请求已取消。', { statusCode: 499 })

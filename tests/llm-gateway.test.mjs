@@ -25,8 +25,7 @@ test('cleans markdown JSON and repairs invalid JSON with a bounded retry', async
   assert.equal(attempts, 2)
   assert.equal(logs[0].finishReason, 'stop')
   assert.equal(logs[0].usage.total_tokens, 7)
-  assert.equal(logs[0].rawResponse.includes('{"ok":'), true)
-  assert.deepEqual(logs.find((entry) => entry.parsedJson)?.parsedJson, { ok: true })
+  assert.ok(logs.every((entry) => entry.rawResponse === undefined && entry.parsedJson === undefined))
 })
 
 test('classifies empty, truncated, and filtered output without an unbounded retry', async () => {

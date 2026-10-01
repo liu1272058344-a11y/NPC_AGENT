@@ -17,14 +17,14 @@ test('visual asset workflow rejects incomplete characters before image generatio
   await assert.rejects(() => runVisualAssetGeneration({ character: { profile: {} }, imageService: async () => ({}) }), { code: 'INVALID_VISUAL_ASSET' })
 })
 
-test('visual asset generation route returns a public validation error', async () => {
+test('visual asset generation route rejects requests without same-origin credentials', async () => {
   const server = startServer(0)
   await new Promise((resolve) => server.once('listening', resolve))
   const port = server.address().port
   try {
     const response = await fetch(`http://localhost:${port}/api/visual-assets/generate`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ character: { profile: {} } }) })
-    assert.equal(response.status, 500)
+    assert.equal(response.status, 403)
     const body = await response.json()
-    assert.equal(body.code, 'INVALID_VISUAL_ASSET')
+    assert.equal(body.code, 'INTERNAL_ERROR')
   } finally { server.close() }
 })

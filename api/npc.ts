@@ -1,3 +1,4 @@
+import { sessionCredential, requireSameOrigin } from '../src/server/credentialSession.mjs'
 const schema = { type: 'object', properties: { worldOptions: { type: 'array', items: { type: 'string' } }, roleOptions: { type: 'array', items: { type: 'string' } }, functionOptions: { type: 'array', items: { type: 'string' } }, personalityOptions: { type: 'array', items: { type: 'string' } } }, required: ['worldOptions', 'roleOptions', 'functionOptions', 'personalityOptions'], additionalProperties: false }
 export interface ReviewResult { approved: boolean; issues: string[]; suggestions: string[]; score?: number }
 export const normalizeReviewResult = (value: Partial<ReviewResult> | null | undefined): ReviewResult => {
@@ -77,11 +78,15 @@ const publicReply = (value: unknown, action: unknown) => {
 }
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' })
+  res.setHeader('Cache-Control', 'no-store')
   const body = req.body || {}
+  let sessionKey: string
+  try { requireSameOrigin(req); sessionKey = sessionCredential(req, body.provider === 'deepseek' ? 'deepseek' : 'openai') }
+  catch (error: any) { return res.status(error.statusCode || 401).json({ message: error.message }) }
   if (Array.isArray(body.messages)) {
     try {
       const provider = body.provider === 'deepseek' ? 'deepseek' : 'openai'
-      const key = typeof body.apiKey === 'string' && body.apiKey ? body.apiKey : provider === 'deepseek' ? process.env.DEEPSEEK_API_KEY : process.env.OPENAI_API_KEY
+      const key = sessionKey
       const result = await runNpcRequest({ messages: body.messages, world: body.world, contentProfile: body.contentProfile, phase: body.phase || 'world', model: body.model || (provider === 'deepseek' ? process.env.DEEPSEEK_MODEL || 'deepseek-chat' : process.env.OPENAI_MODEL || 'gpt-5'), provider, key, requestId: body.requestId })
       return res.status(200).json(result)
     } catch (error) {
@@ -90,10 +95,10 @@ export default async function handler(req: any, res: any) {
       return res.status(error && typeof error === 'object' && 'statusCode' in error ? Number((error as any).statusCode) || 502 : 502).json(publicError)
     }
   }
-  if (!process.env.OPENAI_API_KEY) return res.status(503).json({ error: 'OPENAI_API_KEY is not configured' })
+  if (!sessionKey) return res.status(503).json({ error: 'OPENAI_API_KEY is not configured' })
   const { action, description, draft, model } = req.body || {}
   const prompt = action === 'analyze' ? `拆解用户的NPC需求，给出每个字段3个可选项。用户描述：${description}` : `根据用户描述和已选择字段，输出完整NPC JSON。用户描述：${description}；选择：${JSON.stringify(draft)}`
-  const response = await fetch('https://api.openai.com/v1/responses', { method: 'POST', headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ model: model || process.env.OPENAI_MODEL || 'gpt-5', input: [{ role: 'system', content: '你是 NPC Creator Agent，只输出合法 JSON，不要解释。' }, { role: 'user', content: prompt }], text: { format: { type: 'json_schema', name: action === 'analyze' ? 'npc_draft' : 'npc_profile', strict: true, schema: action === 'analyze' ? schema : { type: 'object', properties: { id: { type: 'string' }, name: { type: 'string' }, role: { type: 'string' }, world: { type: 'string' }, function: { type: 'string' }, personality: { type: 'array', items: { type: 'string' } }, summary: { type: 'string' }, goal: { type: 'string' }, speechStyle: { type: 'string' }, background: { type: 'string' }, sourcePrompt: { type: 'string' } }, required: ['id', 'name', 'role', 'world', 'function', 'personality', 'summary', 'goal', 'speechStyle', 'background', 'sourcePrompt'], additionalProperties: false } } } }) })
+  const response = await fetch('https://api.openai.com/v1/responses', { method: 'POST', headers: { Authorization: `Bearer ${sessionKey}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ model: model || process.env.OPENAI_MODEL || 'gpt-5', input: [{ role: 'system', content: '你是 NPC Creator Agent，只输出合法 JSON，不要解释。' }, { role: 'user', content: prompt }], text: { format: { type: 'json_schema', name: action === 'analyze' ? 'npc_draft' : 'npc_profile', strict: true, schema: action === 'analyze' ? schema : { type: 'object', properties: { id: { type: 'string' }, name: { type: 'string' }, role: { type: 'string' }, world: { type: 'string' }, function: { type: 'string' }, personality: { type: 'array', items: { type: 'string' } }, summary: { type: 'string' }, goal: { type: 'string' }, speechStyle: { type: 'string' }, background: { type: 'string' }, sourcePrompt: { type: 'string' } }, required: ['id', 'name', 'role', 'world', 'function', 'personality', 'summary', 'goal', 'speechStyle', 'background', 'sourcePrompt'], additionalProperties: false } } } }) })
   if (!response.ok) return res.status(502).json({ error: 'OpenAI request failed' })
   const parsedResponse = await response.json(); try { return res.status(200).json(publicReply(parseJsonOutput(parsedResponse.output_text), action)) } catch (error) { return res.status(502).json({ error: error instanceof Error ? error.message : '模型返回内容不完整，请点击重试。' }) }
 }
