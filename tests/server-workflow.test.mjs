@@ -26,3 +26,12 @@ test('workflow returns only a validated world or NPC result', async () => {
   assert.deepEqual(npcResult, { status: 'needs_clarification', phase: 'npc', question: '用途？' })
   await assert.rejects(runNpcRequest({ phase: 'npc', world, messages: [{ role: 'user', content: '设计角色' }], provider: 'deepseek', model: 'deepseek-chat', key: 'k' }, { requestStructured: async () => ({ status: 'complete', phase: 'npc', npc: { name: '坏数据' } }) }))
 })
+
+test('workflow normalizes a validated provider asset type before returning it', async () => {
+  const asset = { type: '环境概念图', style: '厚涂', objects: ['塔'], composition: '广角', palette: '冷色', lighting: '逆光', details: ['雾'], format: 'PNG', aspectRatio: '16:9', promptZh: '雾中高塔', promptEn: 'tower in fog', negativePrompt: 'text' }
+  const result = await runNpcRequest(
+    { phase: 'asset', messages: [{ role: 'user', content: '场景图' }], contentProfile: { notes: '雾中城市' }, provider: 'deepseek', model: 'deepseek-chat', key: 'k' },
+    { requestStructured: async () => ({ status: 'complete', phase: 'asset', asset }) }
+  )
+  assert.equal(result.asset.type, '场景概念图')
+})

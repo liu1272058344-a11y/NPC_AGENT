@@ -2,6 +2,7 @@ import { assetResultSchema, npcResultSchema } from './contracts.mjs'
 import { GatewayError } from './errors.mjs'
 import { generateStructured as defaultRequestStructured } from '../services/llm/llmService.mjs'
 import { validateWorldSchema } from './worldSchemaValidator.mjs'
+import { normalizeAssetType } from './assetType.mjs'
 
 const worldJsonSchema = { type: 'object', properties: { status: { type: 'string' }, phase: { type: 'string' }, question: { type: 'string' }, options: { type: 'array', items: { type: 'string' } }, missingFields: { type: 'array', items: { type: 'string' } }, world: { type: 'object', properties: { name: { type: 'string' }, genre: { type: 'string' }, era: { type: 'string' }, atmosphere: { type: 'string' }, coreRule: { type: 'string' }, centralConflict: { type: 'string' }, summary: { type: 'string' } }, required: ['name', 'genre', 'era', 'atmosphere', 'coreRule', 'centralConflict', 'summary'], additionalProperties: false } }, required: ['status', 'phase'], additionalProperties: false }
 const npcJsonSchema = { type: 'object', properties: { status: { type: 'string' }, phase: { type: 'string' }, question: { type: 'string' }, options: { type: 'array', items: { type: 'string' } }, npc: { type: 'object' } }, required: ['status'], additionalProperties: false }
@@ -22,7 +23,7 @@ const parseNpc = (value) => {
 const parseAsset = (value) => {
   const complete = assetResultSchema.safeParse({ status: 'complete', phase: 'asset', asset: value?.asset || value })
   if (!complete.success) throw new GatewayError('PROVIDER_SCHEMA_MISMATCH', '美术资源结果不符合要求。', { statusCode: 422 })
-  return complete.data
+  return { ...complete.data, asset: { ...complete.data.asset, type: normalizeAssetType(complete.data.asset.type) } }
 }
 
 export async function runNpcRequest(input, dependencies = {}) {
