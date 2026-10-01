@@ -1,7 +1,11 @@
-import { credentialCookie, requireSameOrigin } from '../src/server/credentialSession.mjs'
+import { credentialCookie, credentialProviders, requireSameOrigin, sessionCredential } from '../src/server/credentialSession.mjs'
 
 export default function handler(req: any, res: any) {
   res.setHeader('Cache-Control', 'no-store')
+  if (req.method === 'GET') {
+    const providers = credentialProviders.filter((provider) => { try { sessionCredential(req, provider); return true } catch { return false } })
+    return res.status(200).json({ ok: true, providers })
+  }
   if (req.method !== 'POST') return res.status(405).json({ message: 'POST only' })
   try {
     requireSameOrigin(req)
