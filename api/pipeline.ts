@@ -1,7 +1,7 @@
-import { PipelineController } from '../src/orchestrator/pipelineController.mjs'
 import { handlePipelineRequest } from '../src/server/pipelineHttp.mjs'
+import { runDeployPipeline } from '../src/server/deployPipeline.mjs'
 
-const controller = new PipelineController()
+const controller = { run: runDeployPipeline }
 
 export default async function handler(req: any, res: any) {
   const result = await handlePipelineRequest({ method: req.method, body: req.body || {} }, controller)
