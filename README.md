@@ -4,7 +4,11 @@
 
 Generated images are persisted in Vercel Blob and indexed in Neon Postgres. Each anonymous browser workspace may keep up to 20 images or 100 MB. Images expire 30 days after saving and the daily Vercel Cron removes expired objects.
 
-Configure `DATABASE_URL`, `BLOB_READ_WRITE_TOKEN`, and `CRON_SECRET` from `.env.example`, then apply `db/migrations/001_remote_asset_library.sql` to Neon before deployment. The browser stores only `npc-forge-workspace-id`; image bytes and Base64 data are never stored in localStorage.
+Configure `DATABASE_URL`, `BLOB_READ_WRITE_TOKEN`, `CRON_SECRET`, and `CREDENTIAL_SESSION_SECRET` from `.env.example`, then apply `db/migrations/001_remote_asset_library.sql` to Neon before deployment. The browser stores only `npc-forge-workspace-id`; image bytes and Base64 data are never stored in localStorage.
+
+After deployment, request `GET /api/health`. A ready deployment returns HTTP 200 with all service statuses set to `ready`; an incomplete deployment returns HTTP 503 and identifies only the unavailable capability. The response never includes environment-variable names, connection strings, tokens, or other secret values.
+
+The asset library requires both the database migration and Blob storage. If either dependency is absent, the UI reports that deployment configuration is incomplete instead of presenting the library as empty.
 
 The production smoke check must cover save, refresh/list, archive tabs, zoom, download, delete, quota rejection, and one authorized cleanup request.
 
