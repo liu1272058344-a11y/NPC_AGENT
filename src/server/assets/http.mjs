@@ -25,7 +25,10 @@ export async function handleAssetRequest(request, service) {
   try {
     const workspaceId = workspaceFrom(request.headers)
     let data
-    if (request.action === 'images' && request.method === 'POST') data = await service.saveGeneratedImage({ ...request.body, workspaceId })
+    if (request.action === 'archive' && request.query?.worlds === '1' && request.method === 'GET') data = await service.listWorlds(workspaceId)
+    else if (request.action === 'archive' && request.method === 'POST' && request.body?.world) data = await service.saveWorld(workspaceId,request.body.world)
+    else if (request.action === 'archive' && request.method === 'PATCH') data = await service.updateArchiveMetadata(workspaceId,request.body?.id,request.body?.patch || {})
+    else if (request.action === 'images' && request.method === 'POST') data = await service.saveGeneratedImage({ ...request.body, workspaceId })
     else if (request.action === 'archive' && request.method === 'POST') data = await service.saveArchive(workspaceId, request.body)
     else if (request.action === 'archive' && request.method === 'DELETE') data = await service.deleteArchive(workspaceId, request.body?.id)
     else if (request.action === 'image' && request.method === 'DELETE') data = await service.deleteImage(workspaceId, request.id)

@@ -4,7 +4,7 @@
 
 Generated images are persisted in Vercel Blob and indexed in Neon Postgres. Each anonymous browser workspace may keep up to 20 images or 100 MB. Images expire 30 days after saving and the daily Vercel Cron removes expired objects.
 
-Configure `DATABASE_URL`, `BLOB_READ_WRITE_TOKEN`, `CRON_SECRET`, and `CREDENTIAL_SESSION_SECRET` from `.env.example`, then apply `db/migrations/001_remote_asset_library.sql` to Neon before deployment. The browser stores only `npc-forge-workspace-id`; image bytes and Base64 data are never stored in localStorage.
+Configure `DATABASE_URL`, `BLOB_READ_WRITE_TOKEN`, `CRON_SECRET`, and `CREDENTIAL_SESSION_SECRET` from `.env.example`, then apply the SQL files in `db/migrations` to Neon in numeric order before deployment. Migration `003_content_categories.sql` adds worlds plus immutable Prompt/design snapshots for character, map, scene, and prop assets. The browser stores only small identifiers and editable draft text; image bytes and Base64 data are never stored in localStorage.
 
 After deployment, request `GET /api/health`. A ready deployment returns HTTP 200 with all service statuses set to `ready`; an incomplete deployment returns HTTP 503 and identifies only the unavailable capability. The response never includes environment-variable names, connection strings, tokens, or other secret values.
 
@@ -53,7 +53,7 @@ See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rule
 - `INTERNAL_BETA_MAX_BYTES`：项目 Blob 字节硬上限，默认 `1073741824`（1 GiB）。
 - `INTERNAL_BETA_DAILY_ACTIONS`：全项目每日成本操作熔断值，默认 `30`。
 
-首次部署前在 Neon 执行 `db/migrations/002_internal_beta_guardrails.sql`。未应用迁移时，成本操作会失败关闭，不会绕过额度继续调用上游服务。
+首次部署前在 Neon 按编号依次执行 `db/migrations/001_remote_asset_library.sql`、`002_internal_beta_guardrails.sql` 和 `003_content_categories.sql`。未应用迁移时，相关写入或成本操作会失败关闭，不会绕过额度继续调用上游服务。
 
 该机制不限制每分钟请求数或并发数，也不会改写 Prompt、切换模型、减少审查轮次、降低图片分辨率或压缩图片。达到每日或存储硬上限后，会直接拒绝新的成本操作；读取、下载和删除仍可继续。
 

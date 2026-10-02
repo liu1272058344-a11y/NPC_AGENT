@@ -3,6 +3,7 @@ import { GatewayError } from './errors.mjs'
 import { generateStructured as defaultRequestStructured } from '../services/llm/llmService.mjs'
 import { validateWorldSchema } from './worldSchemaValidator.mjs'
 import { normalizeAssetType } from './assetType.mjs'
+import { generateContent } from './contentGeneration.mjs'
 
 const worldJsonSchema = { type: 'object', properties: { status: { type: 'string' }, phase: { type: 'string' }, question: { type: 'string' }, options: { type: 'array', items: { type: 'string' } }, missingFields: { type: 'array', items: { type: 'string' } }, world: { type: 'object', properties: { name: { type: 'string' }, genre: { type: 'string' }, era: { type: 'string' }, atmosphere: { type: 'string' }, coreRule: { type: 'string' }, centralConflict: { type: 'string' }, summary: { type: 'string' } }, required: ['name', 'genre', 'era', 'atmosphere', 'coreRule', 'centralConflict', 'summary'], additionalProperties: false } }, required: ['status', 'phase'], additionalProperties: false }
 const npcJsonSchema = { type: 'object', properties: { status: { type: 'string' }, phase: { type: 'string' }, question: { type: 'string' }, options: { type: 'array', items: { type: 'string' } }, npc: { type: 'object' } }, required: ['status'], additionalProperties: false }
@@ -27,6 +28,10 @@ const parseAsset = (value) => {
 }
 
 export async function runNpcRequest(input, dependencies = {}) {
+  if (input.phase === 'content') {
+    if (!input.key && !dependencies.requestStructured) throw new GatewayError('CONFIGURATION_ERROR', '模型 API key 未配置。', { statusCode: 503 })
+    return generateContent({ ...input.contentProfile, ...input, requirements:input.contentProfile?.requirements, category:input.contentProfile?.category, itemId:input.contentProfile?.itemId, name:input.contentProfile?.name, design:input.contentProfile?.design }, dependencies)
+  }
   const requestStructured = dependencies.requestStructured || defaultRequestStructured
   if (!Array.isArray(input.messages) || input.messages.length === 0) throw new GatewayError('INVALID_REQUEST', 'messages is required', { statusCode: 400 })
   if (!input.key) throw new GatewayError('CONFIGURATION_ERROR', '模型 API key 未配置。', { statusCode: 503 })

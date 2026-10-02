@@ -35,5 +35,8 @@ export const createAssetApi = ({ workspaceId = getWorkspaceId(), fetchImpl = fet
     deleteRemoteArchive: (id) => request('/api/assets/archive', { method: 'DELETE', body: JSON.stringify({ id }) }),
     getRemoteImageDownloadUrl: (id) => `/api/assets/images/${encodeURIComponent(id)}/download?workspaceId=${encodeURIComponent(workspaceId)}`,
     workspaceId
+    ,listWorlds:()=>request('/api/assets/archive?worlds=1')
+    ,saveWorld:(world)=>request('/api/assets/archive',{method:'POST',body:JSON.stringify({world})})
+    ,updateArchiveMetadata:(id,patch)=>request('/api/assets/archive',{method:'PATCH',body:JSON.stringify({id,patch})})
   }
 }

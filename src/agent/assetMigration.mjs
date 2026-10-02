@@ -6,14 +6,22 @@ export async function migrateLocalAssetRecords(storage, api) {
   const prompts = readJson(storage, 'npc-forge-asset-library', [])
   const remaining = []
   const result = { migrated: 0, expired: 0, pending: 0, migratedArchives: 0 }
-  if (npc || (Array.isArray(prompts) && prompts.length)) {
-    const archive = npc ? { id: npc.id || npc.name, name: npc.name, summary: npc.summary || '', profile: npc } : { id: 'legacy-prompts', name: '旧版 Prompt 档案', summary: '从旧版浏览器资产库迁移', profile: {} }
-    try { await api.saveRemoteArchive({ archive, prompts: (Array.isArray(prompts) ? prompts : []).map((prompt, index) => ({ id: `legacy-prompt:${index}:${prompt.promptEn || ''}`, prompt: prompt.promptEn || prompt.promptZh || '', negativePrompt: prompt.negativePrompt || '', provider: 'legacy', modelId: '' })) }); result.migratedArchives = 1 } catch { result.pending += 1 }
+  const marker=`npc-forge-content-migration:${api.workspaceId || 'default'}`
+  const fingerprint=JSON.stringify({npc,prompts})
+  const promptCategories=new Set((Array.isArray(prompts)?prompts:[]).map(classifyLegacyAsset))
+  const hasNonCharacterPrompt=[...promptCategories].some(category=>category!=='character' && category!=='unknown')
+  const legacyCategory=npc ? (hasNonCharacterPrompt ? 'unknown' : 'character') : (promptCategories.size===1 ? [...promptCategories][0] : 'unknown')
+  const legacyArchiveId=npc?.id || 'legacy-npc'
+  if ((npc || (Array.isArray(prompts) && prompts.length)) && storage.getItem(marker)!==fingerprint) {
+    const archive = npc ? { id: legacyArchiveId, name: npc.name, summary: npc.summary || '', profile: {...npc,category:legacyCategory,needsClassification:legacyCategory==='unknown'} } : { id: 'legacy-prompts', name: '旧版 Prompt 档案', summary: '从旧版浏览器资产库迁移', profile: {category:legacyCategory,needsClassification:legacyCategory==='unknown'} }
+    try { await api.saveRemoteArchive({ archive, prompts: (Array.isArray(prompts) ? prompts : []).map((prompt, index) => ({ id: `legacy-prompt:${index}:${prompt.promptEn || ''}`, prompt: prompt.promptEn || prompt.promptZh || '', promptZh:prompt.promptZh || '',snapshot:{asset:prompt,category:classifyLegacyAsset(prompt)},negativePrompt: prompt.negativePrompt || '', provider: 'legacy', modelId: '' })) }); storage.setItem(marker,fingerprint); result.migratedArchives = 1 } catch { result.pending += 1 }
   }
   for (const image of Array.isArray(images) ? images : []) {
     try {
       const archiveId = image.sourceId || npc?.id || 'legacy-assets'
-      await api.saveRemoteImage({ idempotencyKey: `legacy:${image.id}`, sourceUrl: image.url, archive: { id: archiveId, name: npc?.name || image.type || '旧图片资产', summary: npc?.summary || '从旧版浏览器资产库迁移', profile: npc || { type: image.type } }, prompt: { id: `legacy-prompt:${image.id}`, prompt: image.prompt || '', negativePrompt: image.negativePrompt || '', provider: 'legacy', modelId: image.model || '' }, provider: 'legacy', modelId: image.model || '' })
+      const imageCategory=npc ? legacyCategory : classifyLegacyAsset(image)
+      const legacyProfile = npc ? { ...npc, category: imageCategory, needsClassification: imageCategory === 'unknown' } : { type: image.type, category: imageCategory, needsClassification: imageCategory === 'unknown' }
+      await api.saveRemoteImage({ idempotencyKey: `legacy:${image.id}`, sourceUrl: image.url, archive: { id: archiveId, name: npc?.name || image.type || '旧图片资产', summary: npc?.summary || '从旧版浏览器资产库迁移', profile: legacyProfile }, prompt: { id: `legacy-prompt:${image.id}`, prompt: image.prompt || '', negativePrompt: image.negativePrompt || '', provider: 'legacy', modelId: image.model || '', snapshot: { category: legacyProfile.category, asset: image } }, provider: 'legacy', modelId: image.model || '' })
       result.migrated += 1
     } catch (error) {
       if (error?.code === 'SOURCE_EXPIRED' || error?.code === 'ASSET_NOT_FOUND') result.expired += 1
@@ -24,3 +32,4 @@ export async function migrateLocalAssetRecords(storage, api) {
   else storage.removeItem('npc-forge-image-library')
   return result
 }
+import { classifyLegacyAsset } from '../content/categories.mjs'

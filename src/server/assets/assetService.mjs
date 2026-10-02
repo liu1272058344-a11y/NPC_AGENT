@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { ASSET_LIMITS, expiresAtFrom } from './config.mjs'
 import { fetchSourceImage } from './sourceImage.mjs'
+import { classifyLegacyAsset, contentCategories } from '../../content/categories.mjs'
 
 const normalizeImage = (row) => ({
   id: row.id, archiveId: row.archiveId || row.archive_id, promptRecordId: row.promptRecordId || row.prompt_record_id,
@@ -10,11 +11,24 @@ const normalizeImage = (row) => ({
 })
 
 const quotaWarning = (usage) => usage.imageCount >= ASSET_LIMITS.maxImages * ASSET_LIMITS.warningRatio || usage.byteCount >= ASSET_LIMITS.maxBytes * ASSET_LIMITS.warningRatio
-const normalizeArchive = (row) => ({ id: row.id, name: row.name, summary: row.summary, profile: row.profile || row.profile_json, imageCount: Number(row.imageCount || row.image_count || 0), byteCount: Number(row.byteCount || row.byte_count || 0), coverUrl: row.coverUrl || row.cover_url || undefined, nearestExpiry: row.nearestExpiry || row.nearest_expiry || undefined })
-const normalizePrompt = (row) => ({ id: row.id, prompt: row.prompt, negativePrompt: row.negativePrompt || row.negative_prompt || '', provider: row.provider, modelId: row.modelId || row.model_id, createdAt: row.createdAt || row.created_at })
+const normalizeArchive = (row) => {
+  const profile=row.profile || row.profile_json || {}
+  return { id:row.id,name:row.name,summary:row.summary,profile,category:classifyLegacyAsset(row),worldId:profile.worldId || '',worldName:profile.world?.name || '',tags:profile.tags || [],relatedIds:profile.relatedIds || [],updatedAt:row.updatedAt || row.updated_at,promptCount:Number(row.promptCount || row.prompt_count || 0),imageCount:Number(row.imageCount || row.image_count || 0),byteCount:Number(row.byteCount || row.byte_count || 0),coverUrl:row.coverUrl || row.cover_url,nearestExpiry:row.nearestExpiry || row.nearest_expiry }
+}
+const normalizePrompt = (row) => ({ id: row.id, prompt: row.prompt, promptZh:row.promptZh || row.prompt_zh || '',snapshot:row.snapshot || row.snapshot_json || {},negativePrompt: row.negativePrompt || row.negative_prompt || '', provider: row.provider, modelId: row.modelId || row.model_id, createdAt: row.createdAt || row.created_at })
+const invalid = message => Object.assign(new Error(message),{statusCode:400,code:'INVALID_CONTENT'})
+async function validateArchive(db,workspaceId,archive) {
+  if (!archive || typeof archive.id !== 'string' || !archive.id.trim() || typeof archive.name !== 'string' || !archive.name.trim()) throw invalid('请填写条目名称。')
+  const profile=archive.profile || {}
+  if (profile.category && !contentCategories[profile.category] && profile.category !== 'unknown') throw invalid('资产类别无效。')
+  if (profile.worldId && !await db.findWorld(workspaceId,profile.worldId)) throw invalid('所属世界不存在。')
+  if (profile.relatedIds && (!Array.isArray(profile.relatedIds) || profile.relatedIds.some(id=>typeof id !== 'string'))) throw invalid('关联条目格式无效。')
+  for (const id of profile.relatedIds || []) if (id === archive.id || !await db.getArchiveDetail(workspaceId,id)) throw invalid('关联条目不存在或指向自身。')
+}
 
 export const createAssetService = ({ db, blob, source = fetchSourceImage, now = () => new Date(), uuid = randomUUID }) => ({
   async saveGeneratedImage(input) {
+    await validateArchive(db,input.workspaceId,input.archive)
     await db.ensureWorkspace(input.workspaceId)
     const duplicate = await db.findByIdempotencyKey(input.workspaceId, input.idempotencyKey)
     if (duplicate) {
@@ -43,7 +57,20 @@ export const createAssetService = ({ db, blob, source = fetchSourceImage, now = 
       throw error
     }
   },
-  async saveArchive(workspaceId, input) { await db.ensureWorkspace(workspaceId); const archive = await db.upsertArchive(workspaceId, input.archive); for (const prompt of input.prompts || []) await db.insertPrompt(workspaceId, input.archive.id, prompt); return { archive: normalizeArchive(archive) } },
+  async saveArchive(workspaceId, input) { await validateArchive(db,workspaceId,input.archive); await db.ensureWorkspace(workspaceId); const archive = await db.upsertArchive(workspaceId, input.archive); for (const prompt of input.prompts || []) await db.insertPrompt(workspaceId, input.archive.id, prompt); return { archive: normalizeArchive(archive) } },
+  async listWorlds(workspaceId) { return db.listWorlds(workspaceId) },
+  async saveWorld(workspaceId,world) { if (!world?.id || !world?.name) throw invalid('世界名称与标识必填。'); await db.ensureWorkspace(workspaceId); return db.upsertWorld(workspaceId,world) },
+  async updateArchiveMetadata(workspaceId,id,patch) {
+    const detail=await db.getArchiveDetail(workspaceId,id)
+    if (!detail) throw Object.assign(new Error('条目不存在。'),{statusCode:404})
+    const old=normalizeArchive(detail.archive)
+    const profile={...old.profile}
+    for (const key of ['category','worldId','tags','relatedIds']) if (patch[key] !== undefined) profile[key]=patch[key]
+    if (patch.worldId !== undefined) profile.world=patch.worldId ? (await db.findWorld(workspaceId,patch.worldId))?.profile : null
+    const archive={id,name:patch.name ?? old.name,summary:patch.summary ?? old.summary,profile}
+    await validateArchive(db,workspaceId,archive)
+    return {archive:normalizeArchive(await db.upsertArchive(workspaceId,archive))}
+  },
   async listArchiveSummaries(workspaceId, { allowCreate = false } = {}) { const exists = await db.workspaceExists(workspaceId); if (!exists && !allowCreate) throw Object.assign(new Error('当前工作区不存在，请刷新后重试。'), { code: 'STALE_WORKSPACE', statusCode: 409 }); if (!exists) await db.ensureWorkspace(workspaceId); return { archives: (await db.listArchives(workspaceId)).map(normalizeArchive), usage: await db.getWorkspaceUsage(workspaceId) } },
   async getArchiveDetail(workspaceId, archiveId) { const detail = await db.getArchiveDetail(workspaceId, archiveId); return detail ? { archive: normalizeArchive(detail.archive), prompts: detail.prompts.map(normalizePrompt), images: detail.images.map(normalizeImage) } : null },
   async getImage(workspaceId, id) { return db.findImageAsset(workspaceId, id) },

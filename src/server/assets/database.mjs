@@ -1,6 +1,10 @@
 const usage = (row = {}) => ({ imageCount: Number(row.image_count || 0), byteCount: Number(row.byte_count || 0) })
 
 export const createAssetDatabase = (query) => ({
+  upsertWorld: async (workspaceId, world) => (await query(`INSERT INTO content_worlds (workspace_id,id,name,profile_json) VALUES ($1,$2,$3,$4::jsonb)
+    ON CONFLICT (workspace_id,id) DO UPDATE SET name=EXCLUDED.name,profile_json=EXCLUDED.profile_json,updated_at=now() RETURNING *`, [workspaceId,world.id,world.name,JSON.stringify(world.profile || {})])).rows[0],
+  listWorlds: async (workspaceId) => (await query('SELECT id,name,profile_json AS profile FROM content_worlds WHERE workspace_id=$1 ORDER BY updated_at DESC',[workspaceId])).rows,
+  findWorld: async (workspaceId,id) => (await query('SELECT id,name,profile_json AS profile FROM content_worlds WHERE workspace_id=$1 AND id=$2',[workspaceId,id])).rows[0],
   ensureWorkspace: async (workspaceId) => query('INSERT INTO workspaces (id) VALUES ($1) ON CONFLICT (id) DO UPDATE SET last_seen_at = NOW()', [workspaceId]),
   upsertArchive: async (workspaceId, archive) => (await query(`INSERT INTO npc_archives (id, workspace_id, name, summary, profile_json)
     VALUES ($1,$2,$3,$4,$5::jsonb) ON CONFLICT (workspace_id,id) DO UPDATE SET name=$3, summary=$4, profile_json=$5::jsonb, updated_at=NOW()
@@ -34,8 +38,14 @@ export const createAssetDatabase = (query) => ({
       UPDATE internal_beta_project_usage SET image_count=GREATEST(0,image_count-1), byte_count=GREATEST(0,byte_count-$2) WHERE id=1
     ) UPDATE workspaces SET image_count=GREATEST(0,image_count-1), byte_count=GREATEST(0,byte_count-$2) WHERE id=$1`, [workspaceId, byteSize]),
   reserveUsage: async (workspaceId) => usage((await query(`SELECT COUNT(i.id) AS image_count, COALESCE(SUM(i.byte_size),0) AS byte_count FROM workspaces w LEFT JOIN image_assets i ON i.workspace_id=w.id WHERE w.id=$1 GROUP BY w.id FOR UPDATE`, [workspaceId])).rows[0]),
-  insertPrompt: async (workspaceId, archiveId, prompt) => (await query(`INSERT INTO prompt_records (id,workspace_id,archive_id,prompt,negative_prompt,provider,model_id)
-    VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT (workspace_id,id) DO UPDATE SET prompt=EXCLUDED.prompt RETURNING *`, [prompt.id, workspaceId, archiveId, prompt.prompt, prompt.negativePrompt || '', prompt.provider || '', prompt.modelId || ''])).rows[0],
+  insertPrompt: async (workspaceId, archiveId, prompt) => {
+    const values=[prompt.id,workspaceId,archiveId,prompt.prompt,prompt.negativePrompt || '',prompt.provider || '',prompt.modelId || '',prompt.promptZh || '',JSON.stringify(prompt.snapshot || {})]
+    const result=await query(`INSERT INTO prompt_records (id,workspace_id,archive_id,prompt,negative_prompt,provider,model_id,prompt_zh,snapshot_json)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb) ON CONFLICT (workspace_id,id) DO NOTHING RETURNING *`,values)
+    const row=result.rows[0] || (await query('SELECT * FROM prompt_records WHERE workspace_id=$1 AND id=$2',[workspaceId,prompt.id])).rows[0]
+    if (row?.archive_id && row.archive_id !== archiveId) throw Object.assign(new Error('Prompt 已属于其他条目。'),{statusCode:409})
+    return row
+  },
   insertImageAsset: async (record) => (await query(`INSERT INTO image_assets (id,workspace_id,archive_id,prompt_record_id,blob_url,pathname,content_type,byte_size,width,height,provider,model_id,created_at,expires_at,idempotency_key)
     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`, [record.id, record.workspaceId, record.archiveId, record.promptRecordId, record.blobUrl, record.pathname, record.contentType, record.byteSize, record.width || null, record.height || null, record.provider, record.modelId, record.createdAt, record.expiresAt, record.idempotencyKey])).rows[0],
   insertImageWithQuota: async (record, limits) => {
@@ -56,7 +66,9 @@ export const createAssetDatabase = (query) => ({
   findByIdempotencyKey: async (workspaceId, key) => (await query('SELECT * FROM image_assets WHERE workspace_id=$1 AND idempotency_key=$2', [workspaceId, key])).rows[0] || null,
   listArchives: async (workspaceId) => (await query(`SELECT a.*, COUNT(i.id)::int AS image_count, COALESCE(SUM(i.byte_size),0)::bigint AS byte_count,
     (ARRAY_AGG(i.blob_url ORDER BY i.created_at DESC) FILTER (WHERE i.id IS NOT NULL))[1] AS cover_url,
-    MIN(i.expires_at) AS nearest_expiry FROM npc_archives a LEFT JOIN image_assets i ON i.archive_id=a.id AND i.workspace_id=a.workspace_id WHERE a.workspace_id=$1 GROUP BY a.workspace_id, a.id ORDER BY a.updated_at DESC`, [workspaceId])).rows,
+    MIN(i.expires_at) AS nearest_expiry,
+    (SELECT COUNT(*) FROM prompt_records p WHERE p.workspace_id=a.workspace_id AND p.archive_id=a.id) AS prompt_count
+    FROM npc_archives a LEFT JOIN image_assets i ON i.archive_id=a.id AND i.workspace_id=a.workspace_id WHERE a.workspace_id=$1 GROUP BY a.workspace_id, a.id ORDER BY a.updated_at DESC`, [workspaceId])).rows,
   getArchiveDetail: async (workspaceId, archiveId) => {
     const archive = (await query('SELECT * FROM npc_archives WHERE workspace_id=$1 AND id=$2', [workspaceId, archiveId])).rows[0]
     if (!archive) return null
