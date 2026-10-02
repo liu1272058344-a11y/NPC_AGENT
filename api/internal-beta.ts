@@ -1,5 +1,5 @@
-import { handleBetaSessionRequest, sendBetaResult } from '../../src/server/internalBeta/http.mjs'
-import { createDefaultInternalBetaUsageStore, guardVercelRequest } from '../../src/server/internalBeta/guard.mjs'
+import { handleBetaSessionRequest, sendBetaResult } from '../src/server/internalBeta/http.mjs'
+import { createDefaultInternalBetaUsageStore, guardVercelRequest } from '../src/server/internalBeta/guard.mjs'
 
 export default async function handler(req: any, res: any) {
   const action = String(req.query?.action || '')

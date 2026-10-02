@@ -8,7 +8,7 @@ import archiveHandler from '../../api/assets/archive.ts'
 import imagesHandler from '../../api/assets/images/index.ts'
 import imageRecordHandler from '../../api/assets/images/[id]/index.ts'
 import imageDownloadHandler from '../../api/assets/images/[id]/download.ts'
-import betaHandler from '../../api/internal-beta/[action].ts'
+import betaHandler from '../../api/internal-beta.ts'
 
 const exactRoutes = new Map([
   ['/api/credentials', credentialsHandler], ['/api/health', healthHandler],
