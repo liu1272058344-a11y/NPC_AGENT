@@ -13,6 +13,15 @@ const instructionsFor = (phase, world, contentProfile) => phase === 'world'
   : phase === 'npc'
     ? `你是 NPC Forge NPC 设计 Agent。只返回一个合法 JSON 对象，不要 Markdown、解释或额外文字。严格遵守已确认世界观：${JSON.stringify(world)}。信息不足时返回 {"status":"needs_clarification","phase":"npc","question":"问题","options":["选项"]}；信息充分时返回 {"status":"complete","phase":"npc","npc":{"id":"","name":"","role":"","world":"","function":"","summary":"","background":"","goal":"","speechStyle":"","sourcePrompt":"","personality":["至少一项"],"behaviorRules":["至少一项"]}}。所有字符串非空，NPC 必须自动命名。`
     : `你是 NPC Forge 美术资源 Agent。只返回一个合法 JSON 对象，不要 Markdown、解释或额外文字。严格依据用户选择的游戏内容档案拆解提示词，不得凭空替换设定。已确认世界观兼容字段：${JSON.stringify(world)}。当前内容档案：${JSON.stringify(contentProfile)}。如果档案包含 world，引用其 genre、era、atmosphere、coreRule、centralConflict；如果包含 npc，引用其 name、role、world、function、personality、background、speechStyle；如果同时存在，必须让场景与角色保持一致；如果有 notes，视为用户提供的外部事实。返回 {"status":"complete","phase":"asset","asset":{"type":"","style":"","objects":["至少一项"],"composition":"","palette":"","lighting":"","details":["至少一项"],"format":"","aspectRatio":"","promptZh":"","promptEn":"","negativePrompt":""}}。所有字段非空。`
+const revisionInstructions = (input, phase) => {
+  const base=instructionsFor(phase,input.world,input.contentProfile)
+  if (input.intent === 'revise') {
+    const current=phase === 'world' ? input.currentWorld : input.currentNpc
+    return `${base}\n这是对同一档案的修订。当前${phase === 'world' ? '世界观' : '角色'}完整内容：${JSON.stringify(current || null)}。按照用户本轮要求修改，未被要求修改的字段必须保留。不得切换内容类型。`
+  }
+  if (input.intent === 'regenerate') return `${base}\n这是对同一档案的重新生成，允许重写全部内容，但档案身份由系统保留。不得切换内容类型。`
+  return base
+}
 const publicClarification = (value, phase) => ({ status: 'needs_clarification', phase, ...(typeof value.question === 'string' && value.question.trim() ? { question: value.question.trim() } : {}), ...(Array.isArray(value.options) ? { options: value.options.map(String).map((item) => item.trim()).filter(Boolean) } : {}), ...(Array.isArray(value.missingFields) ? { missingFields: value.missingFields.map(String).map((item) => item.trim()).filter(Boolean) } : {}) })
 const parseWorld = (value) => { if (value?.status === 'needs_clarification') return publicClarification(value, 'world'); const result = validateWorldSchema(value?.world || value); if (result.status === 'SUCCESS') return { status: 'world_ready', phase: 'world', world: result.world }; throw new GatewayError('INVALID_SCHEMA', result.message, { statusCode: 422, providerPayload: result }) }
 const parseNpc = (value) => {
@@ -38,8 +47,9 @@ export async function runNpcRequest(input, dependencies = {}) {
   if (input.phase === 'npc' && (!input.world || typeof input.world !== 'object')) throw new GatewayError('INVALID_REQUEST', 'NPC 生成需要已确认的世界观。', { statusCode: 400 })
   const phase = input.phase || 'world'
   if (phase === 'asset' && (!input.contentProfile || typeof input.contentProfile !== 'object' || (!input.contentProfile.world && !input.contentProfile.npc && !input.contentProfile.notes))) throw new GatewayError('INVALID_REQUEST', '美术资源生成需要至少一个世界观、角色或外部素材。', { statusCode: 400 })
-  const result = await requestStructured({ provider: input.provider, key: input.key, model: input.model, messages: input.messages, instructions: input.instructions || instructionsFor(phase, input.world, input.contentProfile), schema: phase === 'asset' ? assetJsonSchema : phase === 'npc' ? npcJsonSchema : worldJsonSchema, signal: input.signal, requestId: input.requestId, logger: dependencies.logger || ((entry) => console.debug('[NPC Forge LLM]', JSON.stringify(entry))) })
+  const result = await requestStructured({ provider: input.provider, key: input.key, model: input.model, messages: input.messages, instructions: input.instructions || revisionInstructions(input,phase), schema: phase === 'asset' ? assetJsonSchema : phase === 'npc' ? npcJsonSchema : worldJsonSchema, signal: input.signal, requestId: input.requestId, logger: dependencies.logger || ((entry) => console.debug('[NPC Forge LLM]', JSON.stringify(entry))) })
   if (phase === 'asset') return parseAsset(result)
-  if (phase === 'npc') return parseNpc(result)
-  return parseWorld(result)
+  if (phase === 'npc') { const parsed=parseNpc(result); return parsed.npc && input.currentNpc?.id ? {...parsed,npc:{...parsed.npc,id:input.currentNpc.id}} : parsed }
+  const parsed=parseWorld(result)
+  return parsed.world && input.currentWorld?.id ? {...parsed,world:{...parsed.world,id:input.currentWorld.id}} : parsed
 }

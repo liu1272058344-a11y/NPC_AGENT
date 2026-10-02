@@ -2,7 +2,7 @@ import type { ArtAssetPrompt, GameContentProfile, NPC, ReviewResult, WorldProfil
 export type { ReviewResult } from '../types/npc'
 export interface AgentMessage { role: 'user' | 'assistant'; content: string }
 export interface CreatorReply { status: 'needs_clarification' | 'world_ready' | 'complete'; phase?: 'world' | 'npc'; question?: string; options?: string[]; missingFields?: string[]; world?: WorldProfile; npc?: NPC }
-export interface CreateNPCOptions { phase?: 'world' | 'npc'; world?: WorldProfile; signal?: AbortSignal; requestId?: string }
+export interface CreateNPCOptions { phase?: 'world' | 'npc'; world?: WorldProfile; intent?: 'create' | 'revise' | 'regenerate'; currentWorld?: WorldProfile; currentNpc?: NPC; signal?: AbortSignal; requestId?: string }
 export interface CreateAssetOptions { world?: WorldProfile; contentProfile: GameContentProfile; signal?: AbortSignal; requestId?: string }
 
 export interface AgentConfig { endpoint: string; model: string; provider: 'backend' | 'deepseek' | 'openai'; apiKey: string }
@@ -75,6 +75,7 @@ export const sanitizeCreatorReply = (value: unknown): CreatorReply => {
     const candidate = source.world as Record<string, unknown>
     const world = {} as WorldProfile
     for (const field of worldFields) if (typeof candidate[field] === 'string') world[field] = candidate[field] as string
+    if (typeof candidate.id === 'string') world.id = candidate.id
     if (Object.keys(world).length > 0) reply.world = world
   }
   if (source.npc && typeof source.npc === 'object') {
@@ -132,7 +133,7 @@ export async function createNPC(messages: AgentMessage[], options: CreateNPCOpti
   const endpoint = gatewayEndpoint()
   const request = direct
     ? { model: config.model, messages: [{ role: 'system', content: '你是 AI Game Content Pipeline Agent（AI游戏内容生产智能体），工作流分为两阶段。第一阶段先构思世界观；信息不足时一次最多合并询问2-3个最关键问题，已有信息不要重复询问，并提供选择项；充分后返回完整 world。确认世界观后进入 NPC 阶段，一次最多合并询问2-3个缺失字段，优先询问用途、玩家关系、目标和冲突；信息完整后直接返回完整 npc。NPC 必须自动命名，background 包含过去经历、当前处境及与玩家相遇原因，personality 与 behaviorRules 各至少3项。只返回合法 JSON，绝不返回空内容。' }, ...messages], response_format: { type: 'json_object' }, stream: false }
-    : { messages, model: config.model, provider: config.provider === 'backend' ? undefined : config.provider, phase: options.phase || 'world', ...(options.phase === 'npc' && options.world ? { world: options.world } : {}) }
+    : { messages, model: config.model, provider: config.provider === 'backend' ? undefined : config.provider, phase: options.phase || 'world', intent: options.intent || 'create', ...(options.currentWorld ? { currentWorld: options.currentWorld } : {}), ...(options.currentNpc ? { currentNpc: options.currentNpc } : {}), ...(options.phase === 'npc' && options.world ? { world: options.world } : {}) }
   let lastError: unknown
   for (let attempt = 0; attempt < (direct ? 2 : 1); attempt += 1) {
     try {

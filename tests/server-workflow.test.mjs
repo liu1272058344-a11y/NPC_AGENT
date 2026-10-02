@@ -35,3 +35,30 @@ test('workflow normalizes a validated provider asset type before returning it', 
   )
   assert.equal(result.asset.type, '场景概念图')
 })
+
+test('workflow revises the current world without accepting a model-selected archive id', async () => {
+  let instructions = ''
+  const currentWorld = { id: 'world-1', ...world }
+  const result = await runNpcRequest(
+    { phase: 'world', intent: 'revise', currentWorld, messages: [{ role: 'user', content: '把时代改成百年后' }], provider: 'deepseek', model: 'deepseek-chat', key: 'k' },
+    { requestStructured: async (request) => { instructions = request.instructions; return { status: 'world_ready', phase: 'world', world: { ...world, era: '百年后' } } } }
+  )
+  assert.match(instructions, /当前世界观完整内容/)
+  assert.match(instructions, /未被要求修改的字段必须保留/)
+  assert.equal(result.world.id, 'world-1')
+  assert.equal(result.world.era, '百年后')
+})
+
+test('workflow regenerates a character while preserving the archive id and phase', async () => {
+  let instructions = ''
+  const currentNpc = { id: 'character-1', name: '旧角色', role: '医生', world: world.name, function: '治疗', summary: '旧摘要', background: '旧背景', goal: '旧目标', speechStyle: '简短', sourcePrompt: '旧提示', personality: ['谨慎'], behaviorRules: ['先救人'] }
+  const generated = { ...currentNpc, id: 'model-character', name: '新角色' }
+  const result = await runNpcRequest(
+    { phase: 'npc', intent: 'regenerate', currentNpc, world, messages: [{ role: 'user', content: '完全重新设计' }], provider: 'deepseek', model: 'deepseek-chat', key: 'k' },
+    { requestStructured: async (request) => { instructions = request.instructions; return { status: 'complete', phase: 'npc', npc: generated } } }
+  )
+  assert.match(instructions, /允许重写全部内容/)
+  assert.match(instructions, /不得切换内容类型/)
+  assert.equal(result.phase, 'npc')
+  assert.equal(result.npc.id, 'character-1')
+})
