@@ -74,7 +74,7 @@ export const createAssetService = ({ db, blob, source = fetchSourceImage, now = 
     await validateArchive(db,workspaceId,archive)
     return {archive:normalizeArchive(await db.upsertArchive(workspaceId,archive))}
   },
-  async listArchiveSummaries(workspaceId, { allowCreate = false } = {}) { const exists = await db.workspaceExists(workspaceId); if (!exists && !allowCreate) throw Object.assign(new Error('当前工作区不存在，请刷新后重试。'), { code: 'STALE_WORKSPACE', statusCode: 409 }); if (!exists) await db.ensureWorkspace(workspaceId); return { archives: (await db.listArchives(workspaceId)).map(normalizeArchive), worlds: (await db.listWorlds(workspaceId)).map(normalizeWorld), usage: await db.getWorkspaceUsage(workspaceId) } },
+  async listArchiveSummaries(workspaceId, { allowCreate = false } = {}) { const exists = await db.workspaceExists(workspaceId); if (!exists && !allowCreate) throw Object.assign(new Error('当前工作区不存在，请刷新后重试。'), { code: 'STALE_WORKSPACE', statusCode: 409 }); if (!exists) await db.ensureWorkspace(workspaceId); const worlds = db.listWorlds ? await db.listWorlds(workspaceId) : []; return { archives: (await db.listArchives(workspaceId)).map(normalizeArchive), worlds: worlds.map(normalizeWorld), usage: await db.getWorkspaceUsage(workspaceId) } },
   async getArchiveDetail(workspaceId, archiveId) { const detail = await db.getArchiveDetail(workspaceId, archiveId); return detail ? { archive: normalizeArchive(detail.archive), prompts: detail.prompts.map(normalizePrompt), images: detail.images.map(normalizeImage) } : null },
   async getImage(workspaceId, id) { return db.findImageAsset(workspaceId, id) },
   async deleteArchive(workspaceId, id) {

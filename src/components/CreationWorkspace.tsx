@@ -12,6 +12,7 @@ import { CharacterFieldsEditor } from './CharacterFieldsEditor'
 export interface CreationWorkspaceProps {
   initialWorld?:WorldProfile|null
   initialNpc?:NPC|null
+  initialKind?:CreationKind
   onWorldChange:(world:WorldProfile|null)=>void
   onNpcChange:(npc:NPC|null)=>void
   onArchiveSaved?:()=>void
@@ -19,16 +20,16 @@ export interface CreationWorkspaceProps {
 
 const statusLabel={unsaved:'未保存草稿',saved:'已保存',dirty:'有未保存更改'} as const
 const withWorldId=(world:WorldProfile,id:string):WorldProfile=>({...world,id})
-const initialSession=(world?:WorldProfile|null,npc?:NPC|null):CreationSession=>{
+const initialSession=(world?:WorldProfile|null,npc?:NPC|null,kind:CreationKind='world'):CreationSession=>{
   const worldId=world?.id||crypto.randomUUID()
   const worldDraft=world?{...createWorldDraft(()=>worldId),value:withWorldId(world,worldId),saveState:'saved' as const}:createWorldDraft(()=>worldId)
   const characterId=npc?.id||crypto.randomUUID()
   const character=npc?{...createCharacterDraft(()=>characterId,worldDraft.value),value:{...npc,id:characterId},saveState:'saved' as const}:null
-  return {activeKind:'world',world:worldDraft,character}
+  return {activeKind:kind==='character'&&character?'character':'world',world:worldDraft,character}
 }
 
-export function CreationWorkspace({initialWorld,initialNpc,onWorldChange,onNpcChange,onArchiveSaved}:CreationWorkspaceProps){
-  const [session,setSession]=useState<CreationSession>(()=>initialSession(initialWorld,initialNpc))
+export function CreationWorkspace({initialWorld,initialNpc,initialKind,onWorldChange,onNpcChange,onArchiveSaved}:CreationWorkspaceProps){
+  const [session,setSession]=useState<CreationSession>(()=>initialSession(initialWorld,initialNpc,initialKind))
   const [messages,setMessages]=useState<Record<CreationKind,AgentMessage[]>>({world:[],character:[]})
   const [input,setInput]=useState('')
   const [options,setOptions]=useState<string[]>([])

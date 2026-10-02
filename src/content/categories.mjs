@@ -5,9 +5,12 @@ export const contentCategories = Object.freeze({
   prop: { label:'道具', fields:{ function:'用途与交互', shape:'形制与轮廓', materials:'材质与结构', scale:'尺寸与展示视角', condition:'状态与归属' }, focus:'突出物件的结构、材质、轮廓和功能。展示视角与背景应便于观察道具，避免生成以人物为中心的画面。' },
 })
 export const categoryLabel = category => contentCategories[category]?.label || '待分类'
+export const libraryCategoryLabel = category => category === 'world' ? '世界观' : categoryLabel(category)
 export function classifyLegacyAsset(record) {
+  if (record.category === 'world') return 'world'
   if (contentCategories[record.category]) return record.category
   const profile = record.profile || record.profile_json || {}
+  if (profile.category === 'world') return 'world'
   if (contentCategories[profile.category]) return profile.category
   if (profile.personality || record.personality) return 'character'
   const type = String(record.type || profile.type || '')

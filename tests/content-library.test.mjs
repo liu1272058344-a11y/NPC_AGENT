@@ -14,3 +14,13 @@ test('late result updates only the matching request and original item',()=>{
  assert.equal(result.a,state.a)
  assert.equal(result.b.asset.promptEn,'kept')
 })
+
+test('world summaries join the library and same-name ids remain distinct',()=>{
+ const rows=[
+  {id:'world-1',name:'同名世界',category:'world',summary:'第一世界',updatedAt:'2026-10-01'},
+  {id:'world-2',name:'同名世界',category:'world',summary:'第二世界',updatedAt:'2026-10-02'}
+ ]
+ const library=buildContentLibrary(rows,{category:'world'})
+ assert.deepEqual(library.items.map(item=>item.id),['world-2','world-1'])
+ assert.equal(library.counts.world,2)
+})
