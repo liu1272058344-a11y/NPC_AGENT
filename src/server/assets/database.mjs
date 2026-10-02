@@ -3,8 +3,18 @@ const usage = (row = {}) => ({ imageCount: Number(row.image_count || 0), byteCou
 export const createAssetDatabase = (query) => ({
   upsertWorld: async (workspaceId, world) => (await query(`INSERT INTO content_worlds (workspace_id,id,name,profile_json) VALUES ($1,$2,$3,$4::jsonb)
     ON CONFLICT (workspace_id,id) DO UPDATE SET name=EXCLUDED.name,profile_json=EXCLUDED.profile_json,updated_at=now() RETURNING *`, [workspaceId,world.id,world.name,JSON.stringify(world.profile || {})])).rows[0],
-  listWorlds: async (workspaceId) => (await query('SELECT id,name,profile_json AS profile FROM content_worlds WHERE workspace_id=$1 ORDER BY updated_at DESC',[workspaceId])).rows,
-  findWorld: async (workspaceId,id) => (await query('SELECT id,name,profile_json AS profile FROM content_worlds WHERE workspace_id=$1 AND id=$2',[workspaceId,id])).rows[0],
+  listWorlds: async (workspaceId) => (await query('SELECT id,name,profile_json AS profile,updated_at FROM content_worlds WHERE workspace_id=$1 ORDER BY updated_at DESC',[workspaceId])).rows,
+  findWorld: async (workspaceId,id) => (await query('SELECT id,name,profile_json AS profile,updated_at FROM content_worlds WHERE workspace_id=$1 AND id=$2',[workspaceId,id])).rows[0],
+  deleteWorld: async (workspaceId,id) => {
+    const row=(await query(`WITH detached AS (
+      UPDATE npc_archives SET profile_json=profile_json - 'worldId', updated_at=NOW()
+      WHERE workspace_id=$1 AND profile_json->>'worldId'=$2 RETURNING 1
+    ), deleted AS (
+      DELETE FROM content_worlds WHERE workspace_id=$1 AND id=$2 RETURNING 1
+    ) SELECT (SELECT COUNT(*) FROM detached)::int AS detached_count,
+      (SELECT COUNT(*) FROM deleted)::int AS deleted_count`,[workspaceId,id])).rows[0] || {}
+    return { deleted:true, detachedCharacterCount:Number(row.detached_count || 0) }
+  },
   ensureWorkspace: async (workspaceId) => query('INSERT INTO workspaces (id) VALUES ($1) ON CONFLICT (id) DO UPDATE SET last_seen_at = NOW()', [workspaceId]),
   upsertArchive: async (workspaceId, archive) => (await query(`INSERT INTO npc_archives (id, workspace_id, name, summary, profile_json)
     VALUES ($1,$2,$3,$4,$5::jsonb) ON CONFLICT (workspace_id,id) DO UPDATE SET name=$3, summary=$4, profile_json=$5::jsonb, updated_at=NOW()

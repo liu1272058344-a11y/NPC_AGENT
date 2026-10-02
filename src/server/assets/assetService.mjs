@@ -11,6 +11,7 @@ const normalizeImage = (row) => ({
 })
 
 const quotaWarning = (usage) => usage.imageCount >= ASSET_LIMITS.maxImages * ASSET_LIMITS.warningRatio || usage.byteCount >= ASSET_LIMITS.maxBytes * ASSET_LIMITS.warningRatio
+const normalizeWorld = (row) => row ? ({ id:row.id,name:row.name,profile:row.profile || row.profile_json || {},updatedAt:row.updatedAt || row.updated_at }) : null
 const normalizeArchive = (row) => {
   const profile=row.profile || row.profile_json || {}
   return { id:row.id,name:row.name,summary:row.summary,profile,category:classifyLegacyAsset(row),worldId:profile.worldId || '',worldName:profile.world?.name || '',tags:profile.tags || [],relatedIds:profile.relatedIds || [],updatedAt:row.updatedAt || row.updated_at,promptCount:Number(row.promptCount || row.prompt_count || 0),imageCount:Number(row.imageCount || row.image_count || 0),byteCount:Number(row.byteCount || row.byte_count || 0),coverUrl:row.coverUrl || row.cover_url,nearestExpiry:row.nearestExpiry || row.nearest_expiry }
@@ -58,8 +59,10 @@ export const createAssetService = ({ db, blob, source = fetchSourceImage, now = 
     }
   },
   async saveArchive(workspaceId, input) { await validateArchive(db,workspaceId,input.archive); await db.ensureWorkspace(workspaceId); const archive = await db.upsertArchive(workspaceId, input.archive); for (const prompt of input.prompts || []) await db.insertPrompt(workspaceId, input.archive.id, prompt); return { archive: normalizeArchive(archive) } },
-  async listWorlds(workspaceId) { return db.listWorlds(workspaceId) },
-  async saveWorld(workspaceId,world) { if (!world?.id || !world?.name) throw invalid('世界名称与标识必填。'); await db.ensureWorkspace(workspaceId); return db.upsertWorld(workspaceId,world) },
+  async listWorlds(workspaceId) { return (await db.listWorlds(workspaceId)).map(normalizeWorld) },
+  async getWorld(workspaceId,id) { if (typeof id !== 'string' || !id.trim()) throw invalid('世界标识无效。'); return normalizeWorld(await db.findWorld(workspaceId,id)) },
+  async saveWorld(workspaceId,world) { if (!world?.id || !world?.name) throw invalid('世界名称与标识必填。'); await db.ensureWorkspace(workspaceId); return normalizeWorld(await db.upsertWorld(workspaceId,world)) },
+  async deleteWorld(workspaceId,id) { if (typeof id !== 'string' || !id.trim()) throw invalid('世界标识无效。'); return db.deleteWorld(workspaceId,id) },
   async updateArchiveMetadata(workspaceId,id,patch) {
     const detail=await db.getArchiveDetail(workspaceId,id)
     if (!detail) throw Object.assign(new Error('条目不存在。'),{statusCode:404})

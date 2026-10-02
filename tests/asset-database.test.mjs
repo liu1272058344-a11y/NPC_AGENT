@@ -62,3 +62,16 @@ test('deleting an image releases both workspace and project usage', async () => 
   assert.match(calls[0].text, /SUM\(byte_size\)/)
   assert.deepEqual(calls[0].values, ['w1', 'image-1'])
 })
+
+test('world queries expose updated archives and delete by detaching character links atomically', async () => {
+  const calls = []
+  const db = createAssetDatabase(async (text, values = []) => { calls.push({ text, values }); return { rows: [{ detached_count: '2', deleted_count: '1' }], rowCount: 1 } })
+  await db.listWorlds('w1')
+  const result = await db.deleteWorld('w1', 'world-1')
+  assert.match(calls[0].text, /updated_at/)
+  assert.match(calls[1].text, /UPDATE npc_archives/)
+  assert.match(calls[1].text, /profile_json - 'worldId'/)
+  assert.match(calls[1].text, /DELETE FROM content_worlds/)
+  assert.deepEqual(calls[1].values, ['w1', 'world-1'])
+  assert.deepEqual(result, { deleted: true, detachedCharacterCount: 2 })
+})

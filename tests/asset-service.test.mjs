@@ -18,6 +18,7 @@ const harness = (usage = { imageCount: 0, byteCount: 0 }) => {
     insertImageAsset: async (record) => { records.push(record); return record },
     getWorkspaceUsage: async () => usage,
     listArchives: async () => [], getArchiveDetail: async () => null,
+    listWorlds: async () => [], findWorld: async () => null, upsertWorld: async (_workspaceId, world) => world, deleteWorld: async () => ({ deleted: true, detachedCharacterCount: 0 }),
     findImageAsset: async () => null, deleteImageRecord: async () => {}, listExpiredImages: async () => []
   }
   const service = createAssetService({ db, source: async () => ({ bytes: new Uint8Array([1, 2, 3]), contentType: 'image/png', byteSize: 3 }), blob: { putImage: async (pathname) => ({ url: `https://blob/${pathname}`, pathname }), deleteImage: async (value) => deleted.push(value) }, now: () => new Date('2026-09-30T00:00:00Z'), uuid: () => 'image-1' })
@@ -77,4 +78,35 @@ test('reports a stale workspace instead of recreating it while listing', async (
   const { service, db } = harness()
   db.workspaceExists = async () => false
   await assert.rejects(() => service.listArchiveSummaries(input.workspaceId), { code: 'STALE_WORKSPACE' })
+})
+
+test('world archives upsert by stable id while same-name ids remain distinct', async () => {
+  const { service, db } = harness()
+  const worlds = new Map()
+  db.upsertWorld = async (_workspaceId, value) => { worlds.set(value.id, value); return { ...value, updated_at: '2026-10-02T00:00:00Z' } }
+  db.listWorlds = async () => [...worlds.values()]
+  await service.saveWorld('w', { id: 'world-1', name: '同名世界', profile: { summary: '第一版' } })
+  await service.saveWorld('w', { id: 'world-1', name: '同名世界', profile: { summary: '第二版' } })
+  await service.saveWorld('w', { id: 'world-2', name: '同名世界', profile: { summary: '另一个世界' } })
+  assert.equal(worlds.size, 2)
+  assert.equal(worlds.get('world-1').profile.summary, '第二版')
+  assert.equal((await service.listWorlds('w')).length, 2)
+})
+
+test('character archive accepts a valid world link and legacy independent characters', async () => {
+  const { service, db } = harness()
+  const saved = []
+  db.findWorld = async (_workspaceId, id) => id === 'world-1' ? { id, name: '灰烬边城', profile: { summary: '世界快照' } } : null
+  db.upsertArchive = async (_workspaceId, archive) => { saved.push(archive); return archive }
+  await service.saveArchive('w', { archive: { id: 'character-1', name: '林医生', profile: { category: 'character', worldId: 'world-1', world: { name: '灰烬边城' } } } })
+  await service.saveArchive('w', { archive: { id: 'legacy-character', name: '旧角色', profile: { category: 'character', world: '旧世界' } } })
+  assert.equal(saved.length, 2)
+  await assert.rejects(() => service.saveArchive('w', { archive: { id: 'bad', name: '错误角色', profile: { category: 'character', worldId: 'missing' } } }), /所属世界不存在/)
+})
+
+test('world deletion is idempotent and reports detached characters', async () => {
+  const { service, db } = harness()
+  db.deleteWorld = async () => ({ deleted: true, detachedCharacterCount: 3 })
+  assert.deepEqual(await service.deleteWorld('w', 'world-1'), { deleted: true, detachedCharacterCount: 3 })
+  await assert.rejects(() => service.deleteWorld('w', ''), { statusCode: 400 })
 })
