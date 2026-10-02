@@ -76,7 +76,7 @@ function AppContent() {
   const [migrationNotice, setMigrationNotice] = useState('')
   const [imagePromptAsset, setImagePromptAsset] = useState<ArtAssetPrompt | null>(null)
   const [imageTargetArchive, setImageTargetArchive] = useState<CreationImageHandoff['archive'] | null>(null)
-  const restoredCharacterWorld=useRef(readCharacterWorldContext(localStorage)).current
+  const [restoredCharacterWorld]=useState(()=>readCharacterWorldContext(localStorage))
   const [characterImageContext,setCharacterImageContext]=useState<{world:WorldProfile|null;npc:NPC|null;linkWorld:boolean}>(()=>({world:restoredCharacterWorld.worldSnapshot,npc,linkWorld:Boolean(restoredCharacterWorld.worldId)}))
   const [imagePrompt, setImagePrompt] = useState('')
   const [imageNegativePrompt, setImageNegativePrompt] = useState('')
