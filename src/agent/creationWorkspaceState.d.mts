@@ -6,3 +6,5 @@ export function shouldConfirmLeave(draft:WorldDraft|CharacterDraft|null):boolean
 export function readCreationSaveStates(storage:{getItem(key:string):string|null}):{world:'unsaved'|'saved'|'dirty';character:'unsaved'|'saved'|'dirty'}
 export function writeCreationSaveStates(storage:{setItem(key:string,value:string):void},states:{world:'unsaved'|'saved'|'dirty';character:'unsaved'|'saved'|'dirty'}):void
 export function hasUnsavedCreationDraft(states:{world:'unsaved'|'saved'|'dirty';character:'unsaved'|'saved'|'dirty'},world:unknown,npc:unknown):boolean
+export function readCharacterWorldContext(storage:{getItem(key:string):string|null}):{worldId:string;worldSnapshot:WorldDraft['value']}
+export function writeCharacterWorldContext(storage:{setItem(key:string,value:string):void},context:{worldId:string;worldSnapshot:WorldDraft['value']}):void

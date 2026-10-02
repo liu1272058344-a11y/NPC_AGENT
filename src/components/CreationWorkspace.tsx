@@ -15,6 +15,8 @@ export interface CreationWorkspaceProps {
   initialKind?:CreationKind
   initialWorldSaveState?:SaveState
   initialCharacterSaveState?:SaveState
+  initialCharacterWorldId?:string
+  initialCharacterWorldSnapshot?:WorldProfile|null
   onWorldChange:(world:WorldProfile|null)=>void
   onNpcChange:(npc:NPC|null)=>void
   onArchiveSaved?:()=>void
@@ -25,16 +27,16 @@ export interface CreationWorkspaceProps {
 
 const statusLabel={unsaved:'未保存草稿',saved:'已保存',dirty:'有未保存更改'} as const
 const withWorldId=(world:WorldProfile,id:string):WorldProfile=>({...world,id})
-const initialSession=(world?:WorldProfile|null,npc?:NPC|null,kind:CreationKind='world',worldSaveState:SaveState='saved',characterSaveState:SaveState='saved'):CreationSession=>{
+const initialSession=(world?:WorldProfile|null,npc?:NPC|null,kind:CreationKind='world',worldSaveState:SaveState='saved',characterSaveState:SaveState='saved',characterWorldId='',characterWorldSnapshot:WorldProfile|null=null):CreationSession=>{
   const worldId=world?.id||crypto.randomUUID()
   const worldDraft=world?{...createWorldDraft(()=>worldId),value:withWorldId(world,worldId),saveState:worldSaveState}:createWorldDraft(()=>worldId)
   const characterId=npc?.id||crypto.randomUUID()
-  const character=npc?{...createCharacterDraft(()=>characterId,worldDraft.value),value:{...npc,id:characterId},saveState:characterSaveState}:null
+  const character=npc?{...createCharacterDraft(()=>characterId,characterWorldSnapshot),worldId:characterWorldId,value:{...npc,id:characterId},saveState:characterSaveState}:null
   return {activeKind:kind==='character'&&character?'character':'world',world:worldDraft,character}
 }
 
-export function CreationWorkspace({initialWorld,initialNpc,initialKind,initialWorldSaveState,initialCharacterSaveState,onWorldChange,onNpcChange,onArchiveSaved,onUnsavedChange,onUseForImage,onCharacterContextChange}:CreationWorkspaceProps){
-  const [session,setSession]=useState<CreationSession>(()=>initialSession(initialWorld,initialNpc,initialKind,initialWorldSaveState,initialCharacterSaveState))
+export function CreationWorkspace({initialWorld,initialNpc,initialKind,initialWorldSaveState,initialCharacterSaveState,initialCharacterWorldId,initialCharacterWorldSnapshot,onWorldChange,onNpcChange,onArchiveSaved,onUnsavedChange,onUseForImage,onCharacterContextChange}:CreationWorkspaceProps){
+  const [session,setSession]=useState<CreationSession>(()=>initialSession(initialWorld,initialNpc,initialKind,initialWorldSaveState,initialCharacterSaveState,initialCharacterWorldId,initialCharacterWorldSnapshot))
   const [messages,setMessages]=useState<Record<CreationKind,AgentMessage[]>>({world:[],character:[]})
   const [input,setInput]=useState('')
   const [options,setOptions]=useState<string[]>([])

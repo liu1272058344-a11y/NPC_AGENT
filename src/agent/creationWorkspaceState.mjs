@@ -15,3 +15,6 @@ const valid=value=>value==='unsaved'||value==='saved'||value==='dirty'
 export const readCreationSaveStates=storage=>{try{const value=JSON.parse(storage.getItem(saveStateKey)||'null');return value&&valid(value.world)&&valid(value.character)?value:{...defaults}}catch{return {...defaults}}}
 export const writeCreationSaveStates=(storage,states)=>storage.setItem(saveStateKey,JSON.stringify(states))
 export const hasUnsavedCreationDraft=(states,world,npc)=>Boolean((world&&states.world!=='saved')||(npc&&states.character!=='saved'))
+const characterWorldContextKey='npc-forge-character-world-context'
+export const readCharacterWorldContext=storage=>{try{const value=JSON.parse(storage.getItem(characterWorldContextKey)||'null');return value&&typeof value.worldId==='string'?{worldId:value.worldId,worldSnapshot:value.worldSnapshot&&typeof value.worldSnapshot==='object'?value.worldSnapshot:null}:{worldId:'',worldSnapshot:null}}catch{return {worldId:'',worldSnapshot:null}}}
+export const writeCharacterWorldContext=(storage,context)=>storage.setItem(characterWorldContextKey,JSON.stringify({worldId:context.worldId||'',worldSnapshot:context.worldSnapshot||null}))
