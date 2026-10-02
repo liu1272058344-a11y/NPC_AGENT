@@ -12,7 +12,8 @@ test('world archive opens the same stable id in the world workspace',()=>{
 })
 
 test('character archive reopens with its linked world snapshot',()=>{
- const profile={id:'character-1',name:'林医生',role:'医生',world:'灰烬边城',function:'治疗',summary:'地下医生',background:'旧背景',goal:'救人',speechStyle:'简短',sourcePrompt:'医生',personality:['谨慎'],behaviorRules:['先救人'],category:'character',worldId:'world-1',world:worldProfile}
+ const character={id:'character-1',name:'林医生',role:'医生',world:'灰烬边城',function:'治疗',summary:'地下医生',background:'旧背景',goal:'救人',speechStyle:'简短',sourcePrompt:'医生',personality:['谨慎'],behaviorRules:['先救人']}
+ const profile={...character,category:'character',worldId:'world-1',world:worldProfile}
  const selection=creationSelectionFromCharacter({archive:{id:'character-1',name:'林医生',profile}})
  assert.equal(selection.kind,'character')
  assert.equal(selection.npc.id,'character-1')
