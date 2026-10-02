@@ -27,6 +27,17 @@ test('workflow returns only a validated world or NPC result', async () => {
   await assert.rejects(runNpcRequest({ phase: 'npc', world, messages: [{ role: 'user', content: '设计角色' }], provider: 'deepseek', model: 'deepseek-chat', key: 'k' }, { requestStructured: async () => ({ status: 'complete', phase: 'npc', npc: { name: '坏数据' } }) }))
 })
 
+test('workflow can create an independent character without a saved world', async () => {
+  let instructions = ''
+  const npc = { id:'model-id',name:'独行商人',role:'商人',world:'未归档荒原',function:'交易',summary:'独立角色',background:'四处旅行',goal:'寻找货源',speechStyle:'精明',sourcePrompt:'商人',personality:['谨慎'],behaviorRules:['等价交换'] }
+  const result = await runNpcRequest(
+    { phase:'npc',messages:[{role:'user',content:'创建一个不属于任何世界档案的商人'}],provider:'deepseek',model:'deepseek-chat',key:'k' },
+    { requestStructured:async request=>{instructions=request.instructions;return {status:'complete',phase:'npc',npc}} }
+  )
+  assert.equal(result.npc.name,'独行商人')
+  assert.match(instructions,/独立角色/)
+})
+
 test('workflow normalizes a validated provider asset type before returning it', async () => {
   const asset = { type: '环境概念图', style: '厚涂', objects: ['塔'], composition: '广角', palette: '冷色', lighting: '逆光', details: ['雾'], format: 'PNG', aspectRatio: '16:9', promptZh: '雾中高塔', promptEn: 'tower in fog', negativePrompt: 'text' }
   const result = await runNpcRequest(

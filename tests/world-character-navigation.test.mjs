@@ -27,3 +27,9 @@ test('legacy unlinked character opens without inventing a world archive',()=>{
  assert.equal(selection.npc.id,'legacy')
  assert.equal(selection.world,null)
 })
+
+test('detached character ignores its retained world snapshot when no world id exists',()=>{
+ const profile={id:'detached',name:'遗民',role:'向导',world:{...worldProfile},function:'引路',summary:'失去世界关联',background:'旧城居民',goal:'活下去',speechStyle:'寡言',sourcePrompt:'遗民',personality:['警觉'],behaviorRules:['避开危险'],category:'character',worldId:''}
+ const selection=creationSelectionFromCharacter({archive:{id:'detached',name:'遗民',profile}})
+ assert.equal(selection.world,null)
+})

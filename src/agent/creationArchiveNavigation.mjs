@@ -6,6 +6,6 @@ export const creationSelectionFromWorld = record => ({ kind:'world',world:{...pi
 
 export const creationSelectionFromCharacter = detail => {
   const profile=detail.archive.profile || {}
-  const snapshot=profile.world && typeof profile.world === 'object' ? {...pick(profile.world,worldFields),...(profile.worldId ? {id:profile.worldId}: {})} : null
+  const snapshot=profile.worldId && profile.world && typeof profile.world === 'object' ? {...pick(profile.world,worldFields),id:profile.worldId} : null
   return {kind:'character',world:snapshot,npc:{...pick(profile,npcFields),id:detail.archive.id,name:detail.archive.name || profile.name}}
 }
