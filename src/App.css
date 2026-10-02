@@ -132,6 +132,14 @@
 .image-prompt-label textarea { display: block; width: 100%; min-height: 126px; margin-top: 8px; padding: 14px; border: 1px solid #2c3850; border-radius: 10px; color: #fff; background: #182032; line-height: 1.6; resize: vertical; }
 .image-prompt-label + .image-prompt-label textarea { min-height: 78px; }
 .image-prompt-label textarea:focus { border-color: #7c5cff; outline: none; }
+.creation-kind-tabs { display: flex; gap: 8px; align-items: center; }
+.creation-kind-tabs .is-active { border-color: #8b72ff; color: #fff; background: rgba(124,92,255,.2); }
+.creation-editor { margin-top: 18px; }
+.creation-fields { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 14px; margin: 18px 0; }
+.creation-fields label { display: grid; gap: 7px; color: #c2cada; font-size: 12px; }
+.creation-fields input,.creation-fields textarea { width: 100%; box-sizing: border-box; border: 1px solid #2c3850; border-radius: 9px; padding: 11px; color: #fff; background: #182032; }
+.creation-fields textarea { min-height: 92px; resize: vertical; }
+@media (max-width: 760px) { .creation-fields { grid-template-columns: 1fr; } }
 .image-studio-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
 .image-studio-toolbar .section-hint { margin: 0 auto 0 0; }
 .image-studio-result { margin-top: 22px; }
