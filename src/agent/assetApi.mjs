@@ -29,14 +29,16 @@ export const createAssetApi = ({ workspaceId = getWorkspaceId(), fetchImpl = fet
   return {
     listRemoteAssets: async () => { const data = await request('/api/assets', { headers: createWorkspace ? { 'X-Workspace-Create': '1' } : {} }); createWorkspace = false; if (typeof sessionStorage !== 'undefined') sessionStorage.removeItem('npc-forge-workspace-new'); return data },
     getRemoteArchive: (id) => request(`/api/assets?archiveId=${encodeURIComponent(id)}`),
+    getWorld: (id) => request(`/api/assets/archive?worldId=${encodeURIComponent(id)}`),
     saveRemoteImage: (input) => request('/api/assets/images', { method: 'POST', body: JSON.stringify(input) }),
     saveRemoteArchive: (input) => request('/api/assets/archive', { method: 'POST', body: JSON.stringify(input) }),
     deleteRemoteImage: (id) => request(`/api/assets/images/${encodeURIComponent(id)}`, { method: 'DELETE' }),
     deleteRemoteArchive: (id) => request('/api/assets/archive', { method: 'DELETE', body: JSON.stringify({ id }) }),
     getRemoteImageDownloadUrl: (id) => `/api/assets/images/${encodeURIComponent(id)}/download?workspaceId=${encodeURIComponent(workspaceId)}`,
-    workspaceId
-    ,listWorlds:()=>request('/api/assets/archive?worlds=1')
-    ,saveWorld:(world)=>request('/api/assets/archive',{method:'POST',body:JSON.stringify({world})})
-    ,updateArchiveMetadata:(id,patch)=>request('/api/assets/archive',{method:'PATCH',body:JSON.stringify({id,patch})})
+    workspaceId,
+    listWorlds:()=>request('/api/assets/archive?worlds=1'),
+    saveWorld:(world)=>request('/api/assets/archive',{method:'POST',body:JSON.stringify({world})}),
+    deleteWorld:(id)=>request('/api/assets/archive',{method:'DELETE',body:JSON.stringify({worldId:id})}),
+    updateArchiveMetadata:(id,patch)=>request('/api/assets/archive',{method:'PATCH',body:JSON.stringify({id,patch})})
   }
 }

@@ -25,11 +25,13 @@ export async function handleAssetRequest(request, service) {
   try {
     const workspaceId = workspaceFrom(request.headers)
     let data
-    if (request.action === 'archive' && request.query?.worlds === '1' && request.method === 'GET') data = await service.listWorlds(workspaceId)
+    if (request.action === 'archive' && request.query?.worldId && request.method === 'GET') { data = await service.getWorld(workspaceId,request.query.worldId); if (!data) throw Object.assign(new Error('未找到该世界观档案。'),{code:'ASSET_NOT_FOUND',statusCode:404}) }
+    else if (request.action === 'archive' && request.query?.worlds === '1' && request.method === 'GET') data = await service.listWorlds(workspaceId)
     else if (request.action === 'archive' && request.method === 'POST' && request.body?.world) data = await service.saveWorld(workspaceId,request.body.world)
     else if (request.action === 'archive' && request.method === 'PATCH') data = await service.updateArchiveMetadata(workspaceId,request.body?.id,request.body?.patch || {})
     else if (request.action === 'images' && request.method === 'POST') data = await service.saveGeneratedImage({ ...request.body, workspaceId })
     else if (request.action === 'archive' && request.method === 'POST') data = await service.saveArchive(workspaceId, request.body)
+    else if (request.action === 'archive' && request.method === 'DELETE' && request.body?.worldId) data = await service.deleteWorld(workspaceId, request.body.worldId)
     else if (request.action === 'archive' && request.method === 'DELETE') data = await service.deleteArchive(workspaceId, request.body?.id)
     else if (request.action === 'image' && request.method === 'DELETE') data = await service.deleteImage(workspaceId, request.id)
     else if (!request.action && request.method === 'GET' && request.query?.archiveId) {
