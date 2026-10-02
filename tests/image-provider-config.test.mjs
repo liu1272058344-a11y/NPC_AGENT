@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { getImageProviderDefaults, resolveImageModelId } from '../src/agent/imageProviderConfig.mjs'
+import { getImageModelOptions, getImageProviderDefaults, resolveImageModelId } from '../src/agent/imageProviderConfig.mjs'
 
 test('volcengine exposes the Seedream API model ID used by the request', () => {
   assert.deepEqual(getImageProviderDefaults('volcengine'), {
@@ -13,4 +13,15 @@ test('volcengine replaces legacy display names and obsolete IDs with the API mod
   assert.equal(resolveImageModelId('volcengine', 'Doubao-Seedream-5.0-flash-260915'), 'doubao-seedream-5-0-flash-260915')
   assert.equal(resolveImageModelId('volcengine', 'doubao-seedream-5-0-flash-250528'), 'doubao-seedream-5-0-flash-260915')
   assert.equal(resolveImageModelId('volcengine', 'ep-custom'), 'ep-custom')
+})
+
+test('volcengine offers Seedream 5.0 Pro as a selectable image model', () => {
+  assert.deepEqual(getImageModelOptions('volcengine'), [
+    { value: 'doubao-seedream-5-0-flash-260915', label: 'Seedream 5.0 Flash' },
+    { value: 'doubao-seedream-5-0-pro-260628', label: 'Seedream 5.0 Pro' }
+  ])
+})
+
+test('providers without a curated model list keep the custom model input', () => {
+  assert.deepEqual(getImageModelOptions('openai'), [])
 })
