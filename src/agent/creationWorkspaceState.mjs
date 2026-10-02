@@ -8,3 +8,10 @@ export const characterArchivePayload = (draft) => ({
 export const generationFailed = session => session
 
 export const shouldConfirmLeave = draft => draft?.saveState === 'dirty' || (draft?.saveState === 'unsaved' && Boolean(draft?.value))
+
+const saveStateKey='npc-forge-creation-save-states'
+const defaults={world:'saved',character:'saved'}
+const valid=value=>value==='unsaved'||value==='saved'||value==='dirty'
+export const readCreationSaveStates=storage=>{try{const value=JSON.parse(storage.getItem(saveStateKey)||'null');return value&&valid(value.world)&&valid(value.character)?value:{...defaults}}catch{return {...defaults}}}
+export const writeCreationSaveStates=(storage,states)=>storage.setItem(saveStateKey,JSON.stringify(states))
+export const hasUnsavedCreationDraft=(states,world,npc)=>Boolean((world&&states.world!=='saved')||(npc&&states.character!=='saved'))
