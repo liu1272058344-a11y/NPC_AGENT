@@ -8,15 +8,14 @@ import archiveHandler from '../../api/assets/archive.ts'
 import imagesHandler from '../../api/assets/images/index.ts'
 import imageRecordHandler from '../../api/assets/images/[id]/index.ts'
 import imageDownloadHandler from '../../api/assets/images/[id]/download.ts'
-import betaSessionHandler from '../../api/internal-beta/session.ts'
-import betaUsageHandler from '../../api/internal-beta/usage.ts'
+import betaHandler from '../../api/internal-beta/[action].ts'
 
 const exactRoutes = new Map([
   ['/api/credentials', credentialsHandler], ['/api/health', healthHandler],
   ['/api/image', imageHandler], ['/api/npc', npcHandler], ['/api/pipeline', pipelineHandler],
   ['/api/assets', assetsHandler], ['/api/assets/archive', archiveHandler],
-  ['/api/assets/images', imagesHandler], ['/api/internal-beta/session', betaSessionHandler],
-  ['/api/internal-beta/usage', betaUsageHandler]
+  ['/api/assets/images', imagesHandler], ['/api/internal-beta/session', betaHandler],
+  ['/api/internal-beta/usage', betaHandler]
 ])
 
 const readBody = async (req) => {
@@ -44,6 +43,7 @@ export async function routeLocalApi(req, res, url) {
   if (!handler) return false
   try {
     req.query = Object.fromEntries(url.searchParams)
+    if (url.pathname.startsWith('/api/internal-beta/')) req.query.action = url.pathname.split('/').pop()
     if (downloadMatch || imageMatch) req.query.id = decodeURIComponent((downloadMatch || imageMatch)[1])
     req.body = await readBody(req)
     await handler(req, decorateResponse(res))
