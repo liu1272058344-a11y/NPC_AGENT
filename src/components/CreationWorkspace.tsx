@@ -20,6 +20,7 @@ export interface CreationWorkspaceProps {
   onArchiveSaved?:()=>void
   onUnsavedChange?:(hasUnsaved:boolean,states:{world:SaveState;character:SaveState})=>void
   onUseForImage?:(kind:CreationKind)=>void
+  onCharacterContextChange?:(context:{world:WorldProfile|null;npc:NPC|null;linkWorld:boolean})=>void
 }
 
 const statusLabel={unsaved:'未保存草稿',saved:'已保存',dirty:'有未保存更改'} as const
@@ -32,7 +33,7 @@ const initialSession=(world?:WorldProfile|null,npc?:NPC|null,kind:CreationKind='
   return {activeKind:kind==='character'&&character?'character':'world',world:worldDraft,character}
 }
 
-export function CreationWorkspace({initialWorld,initialNpc,initialKind,initialWorldSaveState,initialCharacterSaveState,onWorldChange,onNpcChange,onArchiveSaved,onUnsavedChange,onUseForImage}:CreationWorkspaceProps){
+export function CreationWorkspace({initialWorld,initialNpc,initialKind,initialWorldSaveState,initialCharacterSaveState,onWorldChange,onNpcChange,onArchiveSaved,onUnsavedChange,onUseForImage,onCharacterContextChange}:CreationWorkspaceProps){
   const [session,setSession]=useState<CreationSession>(()=>initialSession(initialWorld,initialNpc,initialKind,initialWorldSaveState,initialCharacterSaveState))
   const [messages,setMessages]=useState<Record<CreationKind,AgentMessage[]>>({world:[],character:[]})
   const [input,setInput]=useState('')
@@ -43,7 +44,7 @@ export function CreationWorkspace({initialWorld,initialNpc,initialKind,initialWo
   const guard=useRef(createRequestGuard())
   const activeDraft=session.activeKind==='world'?session.world:session.character
   const confirmReplace=()=>!shouldConfirmLeave(activeDraft)||window.confirm('当前档案有未保存更改，仍要继续吗？')
-  const publish=(next:CreationSession)=>{setSession(next);onWorldChange(next.world.value);onNpcChange(next.character?.value||null);const states={world:next.world.saveState,character:next.character?.saveState||'saved'};onUnsavedChange?.(Boolean((next.world.value&&states.world!=='saved')||(next.character?.value&&states.character!=='saved')),states)}
+  const publish=(next:CreationSession)=>{setSession(next);onWorldChange(next.world.value);onNpcChange(next.character?.value||null);const states={world:next.world.saveState,character:next.character?.saveState||'saved'};onUnsavedChange?.(Boolean((next.world.value&&states.world!=='saved')||(next.character?.value&&states.character!=='saved')),states);onCharacterContextChange?.({world:next.character?.worldSnapshot||null,npc:next.character?.value||null,linkWorld:Boolean(next.character?.worldId)})}
   const editWorld=(value:WorldProfile)=>publish({...session,world:{...session.world,value:withWorldId(value,session.world.id),saveState:session.world.saveState==='unsaved'?'unsaved':'dirty'}})
   const editCharacter=(value:NPC)=>{if(!session.character)return;publish({...session,character:{...session.character,value:{...value,id:session.character.id},saveState:session.character.saveState==='unsaved'?'unsaved':'dirty'}})}
   const send=async(intent:'create'|'revise'|'regenerate'='create',provided?:string)=>{
