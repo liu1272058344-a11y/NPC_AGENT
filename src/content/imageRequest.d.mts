@@ -4,3 +4,4 @@ export function captureImageRequest(input:{prompt:string;negativePrompt?:string;
 export function imageSavePayload(result:{image:{url:string;size?:string};requestSnapshot:ImageRequestSnapshot},target?:ImageArchiveTarget|null,name?:string):Record<string,unknown>
 export function canGenerateImage(input:{generating:boolean;saving:boolean;prompt:string}):boolean
 export function canSaveImage(input:{generating:boolean;saving:boolean;saved:boolean;hasResult:boolean;targetId:string;targets:ImageArchiveTarget[]}):boolean
+export function resolveImageTargets(remote:ImageArchiveTarget[],acceptedTarget?:ImageArchiveTarget|null,archiveSaved?:boolean):ImageArchiveTarget[]

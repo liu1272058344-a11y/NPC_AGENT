@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { generateImage } from '../agent/image'
 import type { ImageResult } from '../agent/image'
-import { captureImageRequest, imageSavePayload, canGenerateImage, canSaveImage } from '../content/imageRequest.mjs'
+import { captureImageRequest, imageSavePayload, canGenerateImage, canSaveImage, resolveImageTargets } from '../content/imageRequest.mjs'
 import type { ImageArchiveTarget, ImageRequestSnapshot } from '../content/imageRequest.mjs'
 import {receiveStudioHandoff} from '../content/studioHandoff.mjs'
 import type {StudioHandoff} from '../content/studioHandoff.mjs'
@@ -9,18 +9,20 @@ import type { createAssetApi } from '../agent/assetApi.mjs'
 
 export interface ImageEditorInput { id:string;prompt:string;negativePrompt:string;source:Record<string,unknown>|null;mode:ImageRequestSnapshot['mode'];targetId?:string;target?:ImageArchiveTarget|null }
 type Props={provider:string;model:string;endpoint:string;api:ReturnType<typeof createAssetApi>;targets:ImageArchiveTarget[];initial?:ImageEditorInput|null;onSaved:()=>Promise<void>}
-export function ContentImageEditor({provider,model,endpoint,api,targets,initial,onSaved}:Props) {
+export function ContentImageEditor({provider,model,endpoint,api,targets:remoteTargets,initial,onSaved}:Props) {
  const [prompt,setPrompt]=useState(''),[negative,setNegative]=useState(''),[source,setSource]=useState<Record<string,unknown>|null>(null),[mode,setMode]=useState<ImageRequestSnapshot['mode']>('manual')
  const [targetId,setTargetId]=useState(''),[name,setName]=useState(''),[size,setSize]=useState('1024x1024')
  const [result,setResult]=useState<{image:ImageResult;requestSnapshot:ImageRequestSnapshot}|null>(null)
  const [busy,setBusy]=useState(false),[saving,setSaving]=useState(false),[saved,setSaved]=useState(false),[error,setError]=useState('')
+ const [acceptedTarget,setAcceptedTarget]=useState<ImageArchiveTarget|null>(null),[archiveSaved,setArchiveSaved]=useState(false)
+ const targets=resolveImageTargets(remoteTargets,acceptedTarget,archiveSaved)
  const [pending,setPending]=useState<ImageEditorInput|null>(null)
  const consumed=useRef(''),dirty=useRef(false),unsavedImage=useRef(false)
  const lock=useRef(false),saveLock=useRef(false),mounted=useRef(true)
  useEffect(()=>{mounted.current=true;return()=>{mounted.current=false}},[])
- const accept=(value:ImageEditorInput)=>{setPrompt(value.prompt);setNegative(value.negativePrompt);setSource(value.source);setMode(value.mode);setTargetId(value.targetId || '');setError('');setResult(null);setSaved(false);dirty.current=false;unsavedImage.current=false;consumed.current=value.id;setPending(null)}
+ const accept=(value:ImageEditorInput)=>{setPrompt(value.prompt);setNegative(value.negativePrompt);setSource(value.source);setMode(value.mode);setTargetId(value.targetId || '');setAcceptedTarget(value.target || null);setArchiveSaved(!!value.source?.archiveSaved);setError('');setResult(null);setSaved(false);dirty.current=false;unsavedImage.current=false;consumed.current=value.id;setPending(null)}
  useEffect(()=>{if(!initial || consumed.current===initial.id)return;const received=receiveStudioHandoff({prompt,generating:lock.current,saving:saveLock.current,dirty:dirty.current,hasUnsavedImage:unsavedImage.current,consumedId:consumed.current},{...initial,target:initial.target || null} as StudioHandoff);if(received.needsDecision)setPending(initial);else accept(initial)},[initial])
- const manual=()=>{setSource(null);setMode('manual');setTargetId('');setError('');dirty.current=true}
+ const manual=()=>{setSource(null);setMode('manual');setTargetId('');setAcceptedTarget(null);setError('');dirty.current=true}
  const generate=async()=>{
   if(!canGenerateImage({generating:lock.current,saving:saveLock.current,prompt}))return
   let request:ImageRequestSnapshot
@@ -33,7 +35,7 @@ export function ContentImageEditor({provider,model,endpoint,api,targets,initial,
   const target=targetId?targets.find(item=>item.id===targetId):null
   if(targetId && !target){setError('所选条目已不可用，请重新选择保存归属。');return}
   saveLock.current=true;setSaving(true);setError('')
-  try{await api.saveRemoteImage(imageSavePayload(result,target,name));if(mounted.current){setSaved(true);unsavedImage.current=false;await onSaved()}}catch(e){if(mounted.current)setError((e as Error).message)}finally{saveLock.current=false;if(mounted.current)setSaving(false)}
+  try{await api.saveRemoteImage(imageSavePayload(result,target,name));if(mounted.current){setSaved(true);setArchiveSaved(true);unsavedImage.current=false;await onSaved()}}catch(e){if(mounted.current)setError((e as Error).message)}finally{saveLock.current=false;if(mounted.current)setSaving(false)}
  }
  return <section className="panel content-editor image-free-editor"><div className="result-heading"><div><h2>图片生成</h2></div><button className="choice" disabled={busy || saving} onClick={manual}>使用自己的提示词</button></div>
  {pending && <div role="dialog" aria-label="新的生图提示词"><p>当前有编辑内容或未保存图片，要使用新提示词吗？</p><button className="choice" disabled={busy || saving} onClick={()=>{consumed.current=pending.id;setPending(null)}}>继续编辑当前内容</button><button className="primary-button" disabled={busy || saving} onClick={()=>accept(pending)}>使用新提示词</button></div>}

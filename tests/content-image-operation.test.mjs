@@ -13,3 +13,10 @@ test('saving requires an available result and valid explicit target',()=>{
  assert.equal(canSaveImage({...base,targetId:''}),true)
  assert.equal(canSaveImage({...base,targetId:'',generating:true}),false)
 })
+import {resolveImageTargets} from '../src/content/imageRequest.mjs'
+test('accepted local target survives cancelled incoming handoff, deleted saved targets stay absent',()=>{
+ const old={id:'a',name:'A',profile:{}},incoming={id:'b',name:'B',profile:{}}
+ assert.deepEqual(resolveImageTargets([incoming],old,false).map(t=>t.id),['a','b'])
+ assert.deepEqual(resolveImageTargets([],old,true),[])
+ assert.equal(resolveImageTargets([{...old,name:'renamed'}],old,false)[0].name,'renamed')
+})

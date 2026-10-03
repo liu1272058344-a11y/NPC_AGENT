@@ -9,3 +9,4 @@ export function imageSavePayload(result,target=null,name='自由创作') {
 }
 export const canGenerateImage = ({generating,saving,prompt}) => !generating && !saving && !!prompt?.trim()
 export const canSaveImage = ({generating,saving,saved,hasResult,targetId,targets}) => !generating && !saving && !saved && hasResult && (!targetId || targets.some(item=>item.id===targetId))
+export const resolveImageTargets=(remote,acceptedTarget,archiveSaved)=>Array.from(new Map([...(acceptedTarget && !archiveSaved?[acceptedTarget]:[]),...remote].map(t=>[t.id,t])).values())
