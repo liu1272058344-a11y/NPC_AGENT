@@ -1,6 +1,8 @@
 import { credentialCookie, credentialProviders, requireSameOrigin, sessionCredential } from '../src/server/credentialSession.mjs'
+import { guardVercelRequest } from '../src/server/internalBeta/guard.mjs'
 
-export default function handler(req: any, res: any) {
+export default async function handler(req: any, res: any) {
+  if (!await guardVercelRequest(req, res)) return
   res.setHeader('Cache-Control', 'no-store')
   if (req.method === 'GET') {
     const providers = credentialProviders.filter((provider) => { try { sessionCredential(req, provider); return true } catch { return false } })

@@ -1,6 +1,8 @@
 import { workspaceFrom, createDefaultAssetService, downloadFilename } from '../../../../src/server/assets/http.mjs'
+import { guardVercelRequest } from '../../../../src/server/internalBeta/guard.mjs'
 
 export default async function handler(req: any, res: any) {
+  if (!await guardVercelRequest(req, res)) return
   try {
     if (req.method !== 'GET') return res.status(405).json({ ok: false, error: { code: 'METHOD_NOT_ALLOWED', message: '仅支持下载请求。' } })
     const workspaceId = workspaceFrom({ ...req.headers, 'x-workspace-id': req.headers?.['x-workspace-id'] || req.query?.workspaceId })

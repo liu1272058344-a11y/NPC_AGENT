@@ -4,7 +4,11 @@
 
 Generated images are persisted in Vercel Blob and indexed in Neon Postgres. Each anonymous browser workspace may keep up to 20 images or 100 MB. Images expire 30 days after saving and the daily Vercel Cron removes expired objects.
 
-Configure `DATABASE_URL`, `BLOB_READ_WRITE_TOKEN`, and `CRON_SECRET` from `.env.example`, then apply `db/migrations/001_remote_asset_library.sql` to Neon before deployment. The browser stores only `npc-forge-workspace-id`; image bytes and Base64 data are never stored in localStorage.
+Configure `DATABASE_URL`, `BLOB_READ_WRITE_TOKEN`, `CRON_SECRET`, and `CREDENTIAL_SESSION_SECRET` from `.env.example`, then apply the SQL files in `db/migrations` to Neon in numeric order before deployment. Migration `003_content_categories.sql` adds worlds plus immutable Prompt/design snapshots for character, map, scene, and prop assets. The browser stores only small identifiers and editable draft text; image bytes and Base64 data are never stored in localStorage.
+
+After deployment, request `GET /api/health`. A ready deployment returns HTTP 200 with all service statuses set to `ready`; an incomplete deployment returns HTTP 503 and identifies only the unavailable capability. The response never includes environment-variable names, connection strings, tokens, or other secret values.
+
+The asset library requires both the database migration and Blob storage. If either dependency is absent, the UI reports that deployment configuration is incomplete instead of presenting the library as empty.
 
 The production smoke check must cover save, refresh/list, archive tabs, zoom, download, delete, quota rejection, and one authorized cleanup request.
 
@@ -38,3 +42,19 @@ If you are developing a production application, we recommend enabling type-aware
 ```
 
 See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+# 内测访问与免费额度保护
+
+生产部署默认采用应用层内测口令保护。部署前必须在 Vercel 配置以下环境变量：
+
+- `INTERNAL_BETA_PASSWORD`：普通测试者共用口令，至少 12 位随机字符。
+- `INTERNAL_BETA_ADMIN_PASSWORD`：独立管理员口令，至少 12 位且不得与测试口令相同。
+- `INTERNAL_BETA_SESSION_SECRET`：至少 32 位的随机会话签名密钥。
+- `INTERNAL_BETA_MAX_IMAGES`：项目图片硬上限，默认 `200`。
+- `INTERNAL_BETA_MAX_BYTES`：项目 Blob 字节硬上限，默认 `1073741824`（1 GiB）。
+- `INTERNAL_BETA_DAILY_ACTIONS`：全项目每日成本操作熔断值，默认 `30`。
+
+首次部署前在 Neon 按编号依次执行 `db/migrations/001_remote_asset_library.sql`、`002_internal_beta_guardrails.sql` 和 `003_content_categories.sql`。未应用迁移时，相关写入或成本操作会失败关闭，不会绕过额度继续调用上游服务。
+
+该机制不限制每分钟请求数或并发数，也不会改写 Prompt、切换模型、减少审查轮次、降低图片分辨率或压缩图片。达到每日或存储硬上限后，会直接拒绝新的成本操作；读取、下载和删除仍可继续。
+
+管理员登录后可在页面右下角查看应用内总用量。平台级用量仍应定期在 Vercel Usage 和 Neon 控制台检查。轮换口令时更新对应环境变量并重新部署；轮换 `INTERNAL_BETA_SESSION_SECRET` 会立即使全部旧会话失效。

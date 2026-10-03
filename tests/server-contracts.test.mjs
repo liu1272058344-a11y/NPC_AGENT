@@ -3,6 +3,7 @@ import test from 'node:test'
 
 const contracts = await import('../src/server/contracts.mjs')
 const errors = await import('../src/server/errors.mjs')
+const httpResponse = await import('../src/server/httpResponse.mjs')
 
 test('domain schemas accept complete and clarification results only when required fields are present', () => {
   assert.equal(contracts.worldResultSchema.safeParse({ status: 'world_ready', phase: 'world', world: {
@@ -15,4 +16,9 @@ test('domain schemas accept complete and clarification results only when require
 test('public errors expose a stable code and never include provider payloads', () => {
   const error = new errors.GatewayError('PROVIDER_EMPTY_RESPONSE', '模型没有返回内容。', { retryable: true, statusCode: 502, providerPayload: 'secret raw response' })
   assert.deepEqual(errors.toPublicError(error, 'req-1'), { code: 'PROVIDER_EMPTY_RESPONSE', message: '模型没有返回内容。', retryable: true, requestId: 'req-1' })
+})
+
+test('successful HTTP responses echo a supplied request id only', () => {
+  assert.deepEqual(httpResponse.withRequestId({ status: 'world_ready' }, 'req-7'), { status: 'world_ready', requestId: 'req-7' })
+  assert.deepEqual(httpResponse.withRequestId({ status: 'world_ready' }, undefined), { status: 'world_ready' })
 })

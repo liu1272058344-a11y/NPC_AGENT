@@ -12,3 +12,12 @@ NPC Forge AI 后续开发执行要求
 8. 如果任何一步失败，继续定位并修复，修复后重新完成整套流程。
 
 只有完整流程成功跑通后，才可以向用户报告任务完成。不要仅以 TypeScript 编译通过或 Vite 构建通过作为完成标准。
+INTERNAL BETA / COST GUARDRAILS
+- [ ] Apply db/migrations/002_internal_beta_guardrails.sql to Neon.
+- [ ] Configure separate random INTERNAL_BETA_PASSWORD and INTERNAL_BETA_ADMIN_PASSWORD values.
+- [ ] Configure a 32+ character INTERNAL_BETA_SESSION_SECRET.
+- [ ] Confirm INTERNAL_BETA_MAX_IMAGES=200, INTERNAL_BETA_MAX_BYTES=1073741824, INTERNAL_BETA_DAILY_ACTIONS=30 (or intentional overrides).
+- [ ] Verify an unauthenticated production API request returns INTERNAL_BETA_AUTH_REQUIRED.
+- [ ] Verify tester login cannot open the administrator usage endpoint.
+- [ ] Verify administrator login shows the aggregate usage card.
+- [ ] Review Vercel Usage and Neon usage before each internal testing round.

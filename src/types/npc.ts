@@ -14,6 +14,7 @@ export interface NPC {
 }
 
 export interface WorldProfile {
+  id?: string
   name: string
   genre: string
   era: string

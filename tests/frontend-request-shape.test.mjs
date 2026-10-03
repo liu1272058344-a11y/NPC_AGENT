@@ -131,3 +131,26 @@ test('provider mode never posts the backend contract to a provider URL', async (
     assert.notEqual(calls[0].input, 'https://api.deepseek.com')
   } finally { globalThis.fetch = originalFetch }
 })
+
+test('world and character revisions send the current draft without changing phase', async () => {
+  const originalFetch = globalThis.fetch
+  const calls = []
+  globalThis.fetch = async (_input, init) => {
+    const payload = JSON.parse(init.body); calls.push(payload)
+    if (payload.phase === 'world') return new Response(JSON.stringify({ status: 'world_ready', phase: 'world', world }), { status: 200 })
+    return new Response(JSON.stringify({ status: 'needs_clarification', phase: 'npc', question: '还要修改什么？' }), { status: 200 })
+  }
+  try {
+    const currentWorld = { id: 'world-1', ...world }
+    const currentNpc = { id: 'character-1', name: '林医生', role: '医生', world: world.name, function: '治疗', summary: '地下医生', background: '曾任急救员', goal: '保护病人', speechStyle: '简短', sourcePrompt: '医生', personality: ['谨慎'], behaviorRules: ['先救人'] }
+    await agent.createNPC([{ role: 'user', content: '把时代改成灾后十一年' }], { phase: 'world', intent: 'revise', currentWorld })
+    await agent.createNPC([{ role: 'user', content: '补充他的秘密' }], { phase: 'npc', intent: 'revise', world: currentWorld, currentNpc })
+    assert.equal(calls[0].phase, 'world')
+    assert.equal(calls[0].intent, 'revise')
+    assert.equal(calls[0].currentWorld.id, 'world-1')
+    assert.equal(calls[1].phase, 'npc')
+    assert.equal(calls[1].intent, 'revise')
+    assert.equal(calls[1].currentNpc.id, 'character-1')
+    assert.equal(calls[1].world.id, 'world-1')
+  } finally { globalThis.fetch = originalFetch }
+})

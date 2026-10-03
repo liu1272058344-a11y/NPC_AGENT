@@ -27,3 +27,19 @@ test('volcengine image service explicitly disables the visible watermark', async
     assert.equal(JSON.parse(request.init.body).watermark, false)
   } finally { globalThis.fetch = originalFetch }
 })
+
+test('volcengine image service sends the selected Seedream 5.0 Pro model ID unchanged', async () => {
+  const originalFetch = globalThis.fetch
+  let request
+  globalThis.fetch = async (url, init) => {
+    request = { url, init }
+    return new Response(JSON.stringify({ data: [{ url: 'https://example.test/seedream-pro.png' }] }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+  }
+  try {
+    const result = await generateImage({ prompt: 'fantasy world map', apiKey: 'test-key', provider: 'volcengine', model: 'doubao-seedream-5-0-pro-260628' })
+    const payload = JSON.parse(request.init.body)
+    assert.equal(payload.model, 'doubao-seedream-5-0-pro-260628')
+    assert.equal(payload.watermark, false)
+    assert.equal(result.model, 'doubao-seedream-5-0-pro-260628')
+  } finally { globalThis.fetch = originalFetch }
+})

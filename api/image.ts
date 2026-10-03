@@ -1,9 +1,11 @@
 import { sessionCredential, requireSameOrigin } from '../src/server/credentialSession.mjs'
 import { generateImage } from '../src/services/image/imageService.mjs'
 import { resolveImageCredentials } from '../src/server/imageCredentials.mjs'
+import { guardVercelRequest } from '../src/server/internalBeta/guard.mjs'
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only', code: 'METHOD_NOT_ALLOWED' })
+  if (!await guardVercelRequest(req, res, { costKind: 'image' })) return
   const body = req.body || {}
   res.setHeader('Cache-Control', 'no-store')
   try {

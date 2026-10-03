@@ -132,6 +132,14 @@
 .image-prompt-label textarea { display: block; width: 100%; min-height: 126px; margin-top: 8px; padding: 14px; border: 1px solid #2c3850; border-radius: 10px; color: #fff; background: #182032; line-height: 1.6; resize: vertical; }
 .image-prompt-label + .image-prompt-label textarea { min-height: 78px; }
 .image-prompt-label textarea:focus { border-color: #7c5cff; outline: none; }
+.creation-kind-tabs { display: flex; gap: 8px; align-items: center; }
+.creation-kind-tabs .is-active { border-color: #8b72ff; color: #fff; background: rgba(124,92,255,.2); }
+.creation-editor { margin-top: 18px; }
+.creation-fields { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 14px; margin: 18px 0; }
+.creation-fields label { display: grid; gap: 7px; color: #c2cada; font-size: 12px; }
+.creation-fields input,.creation-fields textarea { width: 100%; box-sizing: border-box; border: 1px solid #2c3850; border-radius: 9px; padding: 11px; color: #fff; background: #182032; }
+.creation-fields textarea { min-height: 92px; resize: vertical; }
+@media (max-width: 760px) { .creation-fields { grid-template-columns: 1fr; } }
 .image-studio-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
 .image-studio-toolbar .section-hint { margin: 0 auto 0 0; }
 .image-studio-result { margin-top: 22px; }
@@ -144,3 +152,28 @@
 .asset-delete { color: #ffaaaa; border-color: #884b59; }
 .asset-delete:hover { background: #522839; }
 .asset-delete:disabled { opacity: .5; cursor: wait; }
+.beta-login { min-height: 100vh; display: grid; place-items: center; padding: 24px; background: radial-gradient(circle at top, #18233d, #080b12 65%); }
+.beta-login-card { width: min(440px, 100%); display: grid; gap: 18px; padding: 32px; border: 1px solid rgba(125, 161, 255, .25); border-radius: 18px; background: rgba(13, 19, 32, .96); box-shadow: 0 24px 80px rgba(0, 0, 0, .45); }
+.beta-login-card h1, .beta-login-card p { margin: 0; }
+.beta-login-card label { display: grid; gap: 8px; }
+.beta-login-card input { width: 100%; box-sizing: border-box; }
+.beta-usage { position: fixed; z-index: 20; right: 18px; bottom: 18px; display: grid; gap: 4px; max-width: min(520px, calc(100vw - 36px)); padding: 12px 16px; border: 1px solid rgba(97, 211, 167, .45); border-radius: 12px; color: #d9fff0; background: rgba(9, 25, 23, .94); box-shadow: 0 10px 35px rgba(0, 0, 0, .35); font-size: 13px; }
+.beta-usage.beta-warning { border-color: rgba(250, 199, 90, .7); color: #ffeab6; background: rgba(42, 31, 9, .95); }
+.beta-usage.beta-risk { border-color: rgba(255, 101, 122, .75); color: #ffd5dc; background: rgba(45, 12, 20, .96); }
+.beta-logout { position: fixed; z-index: 21; top: 14px; right: 18px; padding: 7px 12px; border: 1px solid rgba(255,255,255,.16); border-radius: 9px; color: #d9e2f5; background: rgba(12,18,30,.86); cursor: pointer; }
+.content-editor { display:grid; gap:18px; }
+.content-editor label { display:grid; gap:8px; margin:12px 0; }
+.content-editor textarea { min-height:100px; }
+.content-editor input,.content-editor select,.content-toolbar input,.content-toolbar select { min-width:0; padding:12px; border:1px solid #35415c; border-radius:8px; color:#edf1fb; background:#141b2b; }
+.content-editor dd { margin:8px 0 22px; white-space:pre-wrap; line-height:1.7; }
+.content-editor dt { color:#8bdef2; }
+.content-editor pre { white-space:pre-wrap; overflow-wrap:anywhere; }
+.content-category-picker,.content-toolbar { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px; }
+.content-category-picker .is-active { background:#7056df; border-color:#a694ff; color:white; }
+.content-toolbar input { flex:1; }
+.content-asset-card { text-align:left; color:inherit; cursor:pointer; }
+.content-asset-card p { display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+.content-asset-card small { display:block; margin:8px 0; }
+.content-image-button { border:0; background:transparent; padding:0; cursor:zoom-in; }
+.preserve-text { white-space:pre-wrap; overflow-wrap:anywhere; }
+@media(max-width:640px) { .content-category-picker .choice { flex:1 0 40%; } .content-toolbar > * { width:100%; } }
