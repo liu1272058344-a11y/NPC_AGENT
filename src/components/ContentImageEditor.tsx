@@ -20,7 +20,7 @@ export function ContentImageEditor({provider,model,endpoint,api,targets:remoteTa
  const consumed=useRef(''),dirty=useRef(false),unsavedImage=useRef(false)
  const lock=useRef(false),saveLock=useRef(false),mounted=useRef(true)
  useEffect(()=>{mounted.current=true;return()=>{mounted.current=false}},[])
- const accept=(value:ImageEditorInput)=>{setPrompt(value.prompt);setNegative(value.negativePrompt);setSource(value.source);setMode(value.mode);setTargetId(value.targetId || '');setAcceptedTarget(value.target || null);setArchiveSaved(!!value.source?.archiveSaved);setError('');setResult(null);setSaved(false);dirty.current=false;unsavedImage.current=false;consumed.current=value.id;setPending(null)}
+ const accept=(value:ImageEditorInput)=>{setPrompt(value.prompt);setNegative(value.negativePrompt);setSource(value.source);setMode(value.mode);setTargetId(value.targetId || '');setAcceptedTarget(value.target || null);setArchiveSaved(!!value.source?.archiveSaved || remoteTargets.some(t=>t.id===value.targetId));setError('');setResult(null);setSaved(false);dirty.current=false;unsavedImage.current=false;consumed.current=value.id;setPending(null)}
  useEffect(()=>{if(!initial || consumed.current===initial.id)return;const received=receiveStudioHandoff({prompt,generating:lock.current,saving:saveLock.current,dirty:dirty.current,hasUnsavedImage:unsavedImage.current,consumedId:consumed.current},{...initial,target:initial.target || null} as StudioHandoff);if(received.needsDecision)setPending(initial);else accept(initial)},[initial])
  const manual=()=>{setSource(null);setMode('manual');setTargetId('');setAcceptedTarget(null);setError('');dirty.current=true}
  const generate=async()=>{
