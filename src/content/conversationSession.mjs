@@ -11,7 +11,7 @@ export function beginConversationTurn(session,text,requestId){
  return {...session,input:text,messages:[...session.messages,message],pendingRequest:{id:requestId,messageId:message.id},failedMessageId:undefined,error:undefined,options:[],status:session.status==='saved'?'dirty':session.status,updatedAt:new Date().toISOString()}
 }
 export function retryConversationTurn(session,requestId){
- if(session.pendingRequest || !session.failedMessageId)return session
+ if(session.pendingRequest || !session.failedMessageId || session.input!==session.messages.find(m=>m.id===session.failedMessageId)?.content)return session
  return {...session,pendingRequest:{id:requestId,messageId:session.failedMessageId},error:undefined}
 }
 export function conversationReply(result){return result.status==='needs_clarification'?result.question || result.assistantMessage || '请补充希望达到的用途和画面方向。':result.assistantMessage || (result.world?`已整理「${result.world.name}」的世界设定。${result.world.summary}`:`已整理「${result.design?.name || '内容'}」的设计和视觉提示词。${result.design?.summary || ''}`)}
@@ -30,9 +30,9 @@ export function failConversationTurn(session,requestId,error){
  return {...session,failedMessageId:session.pendingRequest.messageId,pendingRequest:undefined,error}
 }
 export function restoreConversationSessions(values){return Object.fromEntries(Object.entries(values || {}).filter(([,s])=>s && typeof s.id==='string' && Array.isArray(s.messages)).map(([id,s])=>[id,{...s,pendingRequest:undefined,...(s.pendingRequest?{failedMessageId:s.pendingRequest.messageId,error:'上次生成已中断，可以重试。'}:{})}]))}
-export function sessionFromArchive(detail){
+export function sessionFromArchive(detail,promptId){
  const a=detail.archive,p=a.profile || {},kind=a.category || p.category || 'unknown',history=p.conversation?.messages
- const record=detail.prompts?.[0],resumed=resumePromptData(record)
+ const record=promptId?detail.prompts?.find(p=>p.id===promptId):detail.prompts?.[0],resumed=resumePromptData(record)
  const raw=p.design || (kind==='world'?undefined:{name:a.name,summary:a.summary || '',fields:p.fields || {}})
  const asset=resumed.asset || (record?{type:categoryLabel(kind),style:'',objects:[],composition:'',palette:'',lighting:'',details:[],format:'png',aspectRatio:'1:1',promptZh:record.promptZh || '',promptEn:record.prompt,negativePrompt:record.negativePrompt || ''}:p.asset)
  const worldValue=kind==='world'?Object.fromEntries(['id','name','genre','era','atmosphere','coreRule','centralConflict','summary','visualDirection','revision'].filter(k=>p[k]!==undefined).map(k=>[k,p[k]])):undefined
@@ -53,6 +53,6 @@ export function editConversationSession(session,patch,idFactory=()=>crypto.rando
 }
 export function conversationImageHandoff(session,language='en'){
  if(!session.asset)throw new Error('请先生成视觉提示词。')
- return createStudioHandoff({prompt:language==='zh'?session.asset.promptZh:session.asset.promptEn,negativePrompt:session.asset.negativePrompt,source:{...session.context,itemId:session.id,name:session.name,category:session.kind,archiveSaved:session.status==='saved',revision:session.revision},target:conversationArchivePayload(session).archive,mode:session.promptMode || 'generated'})
+ return createStudioHandoff({prompt:language==='zh'?session.asset.promptZh:session.asset.promptEn,negativePrompt:session.asset.negativePrompt,source:{...session.context,context:session.context,asset:session.asset,design:session.design,itemId:session.id,name:session.name,category:session.kind,archiveSaved:session.status!=='draft',revision:session.revision},target:conversationArchivePayload(session).archive,mode:session.promptMode || 'generated'})
 }
 export function sessionFromLegacyDraft(draft){return {...sessionFromArchive({archive:{id:draft.id,name:draft.name || '',profile:{...draft.originalProfile,category:draft.category,worldId:draft.worldId,world:draft.worldSnapshot,design:draft.design || {name:draft.name || '',summary:draft.requirements || '',fields:draft.fields || {}},asset:draft.asset,visualBrief:draft.visualBrief,overrides:draft.overrides,requirements:draft.requirements}},prompts:[],images:[]}),status:draft.saved && !draft.dirty?'saved':'draft',input:draft.requirements || '',asset:draft.asset}}

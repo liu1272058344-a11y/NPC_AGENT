@@ -4,7 +4,7 @@ const stableHash = (value) => {
   for (const character of value) { hash ^= character.charCodeAt(0); hash = Math.imul(hash, 16777619) }
   return (hash >>> 0).toString(36)
 }
-const stableLegacyId = (kind, workspaceId, value) => `legacy-${kind}-${stableHash(`${workspaceId}:${JSON.stringify(value)}`)}`
+export const stableLegacyId = (kind, workspaceId, value) => `legacy-${kind}-${stableHash(`${workspaceId}:${JSON.stringify(value)}`)}`
 
 export async function migrateLocalAssetRecords(storage, api) {
   const images = readJson(storage, 'npc-forge-image-library', [])

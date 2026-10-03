@@ -14,7 +14,7 @@ export function retryConversationTurn(session:ConversationSession,requestId:stri
 export function completeConversationTurn(session:ConversationSession,requestId:string,result:ConversationResult):ConversationSession
 export function failConversationTurn(session:ConversationSession,requestId:string,error:string):ConversationSession
 export function restoreConversationSessions(values:Record<string,ConversationSession>):Record<string,ConversationSession>
-export function sessionFromArchive(detail:RemoteArchiveDetail):ConversationSession
+export function sessionFromArchive(detail:RemoteArchiveDetail,promptId?:string):ConversationSession
 export function sessionFromLegacyDraft(draft:Record<string,unknown>):ConversationSession
 export function conversationArchivePayload(session:ConversationSession):{world?:{id:string;name:string;profile:Record<string,unknown>};archive?:{id:string;name:string;summary:string;profile:Record<string,unknown>};prompts?:Record<string,unknown>[]}
 export function editConversationSession(session:ConversationSession,patch:Partial<ConversationSession>,idFactory?:()=>string):ConversationSession
