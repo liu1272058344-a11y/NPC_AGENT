@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { draftLabel, transitionDraft, validateDraftName } from '../content/draftState.mjs'
 import { contentCategories, categoryLabel, libraryCategoryLabel } from '../content/categories.mjs'
 import type { ContentCategory } from '../content/categories.mjs'
 import { createAssetApi } from '../agent/assetApi.mjs'
@@ -8,7 +9,7 @@ import { generateImage } from '../agent/image'
 import type { ArtAssetPrompt, WorldProfile } from '../types/npc'
 import { ContentItemDetail } from './ContentItemDetail'
 
-type Draft = { id:string; category:ContentCategory;name:string;requirements:string;worldId:string;tags:string;relatedIds?:string[];fields:Record<string,string>;design?:{name:string;summary:string;fields:Record<string,string>};asset?:ArtAssetPrompt;requestId?:string;promptId?:string;promptProvider?:string;promptModel?:string;busy?:boolean;error?:string;notice?:string;image?:{url:string;model:string;size:string};imagePrompt?:string;imageNegative?:string;imagePromptId?:string;imageProvider?:string;imageModel?:string;imageId?:string;imageDesignSnapshot?:Draft['design'] }
+type Draft = { saved?:boolean;dirty?:boolean;savedSnapshot?:Draft; id:string; category:ContentCategory;name:string;requirements:string;worldId:string;tags:string;relatedIds?:string[];fields:Record<string,string>;design?:{name:string;summary:string;fields:Record<string,string>};asset?:ArtAssetPrompt;requestId?:string;promptId?:string;promptProvider?:string;promptModel?:string;busy?:boolean;error?:string;notice?:string;image?:{url:string;model:string;size:string};imagePrompt?:string;imageNegative?:string;imagePromptId?:string;imageProvider?:string;imageModel?:string;imageId?:string;imageDesignSnapshot?:Draft['design'] }
 type Props={mode:'studio'|'images'|'library';world:WorldProfile|null;provider:string;model:string;imageProvider:string;imageModel:string;imageEndpoint:string;onEditCreationArchive?:(kind:'world'|'character',id:string)=>void}
 const storageKey='npc-forge-content-drafts-v1'
 const readDrafts=():Record<string,Draft>=>{try{return Object.fromEntries(Object.entries(JSON.parse(localStorage.getItem(storageKey)||'{}')).map(([id,value])=>[id,{...(value as Draft),busy:false}]))}catch{return {}}}
@@ -28,12 +29,14 @@ export function ContentWorkspace(props:Props) {
  const [worldFilter,setWorldFilter]=useState('')
  const [status,setStatus]=useState('')
  const [editorOpen,setEditorOpen]=useState(false)
+ const [pendingSwitch,setPendingSwitch]=useState<{targetId:string;category:ContentCategory;fresh?:Draft}|null>(null)
  const draft=drafts[selected]
- const update=(id:string,patch:Partial<Draft>)=>setDrafts(old=>({...old,[id]:{...old[id],...patch}}))
+ const update=(id:string,patch:Partial<Draft>)=>setDrafts(old=>({...old,[id]:{...old[id],...patch,...(Object.keys(patch).some(k=>['name','requirements','worldId','tags','fields','asset','visualBrief','overrides'].includes(k))?{dirty:true}:{})}}))
+ const switchDraft=(targetId:string,nextCategory:ContentCategory,fresh?:Draft,decision?:'keep'|'discard'|'cancel')=>{const result=transitionDraft({selected,drafts},{targetId,decision});if(result.needsDecision){setPendingSwitch({targetId,category:nextCategory,fresh});return}if(decision==='cancel'){setPendingSwitch(null);return}setDrafts(fresh?{...result.state.drafts,[fresh.id]:fresh}:result.state.drafts);setSelected(targetId);setCategory(nextCategory);setDetail(null);setPendingSwitch(null)}
  useEffect(()=>{try{const compact=Object.fromEntries(Object.entries(drafts).map(([id,item])=>[id,item.image?.url.startsWith('data:')?{...item,image:undefined}:item]));localStorage.setItem(storageKey,JSON.stringify(compact))}catch{setError('浏览器草稿空间不足，请先保存到资产库。')}},[drafts])
  const reload=async()=>{setLoading(true);setError('');try{const assets=await api.listRemoteAssets();setArchives(assets.archives);setWorlds(assets.worlds||[])}catch(e){setError(message(e))}finally{setLoading(false)}}
  useEffect(()=>{setEditorOpen(false);void reload()},[props.mode])
- const create=(type:ContentCategory=category)=>{const id=crypto.randomUUID();setDrafts(old=>({...old,[id]:{id,category:type,name:'',requirements:'',worldId:'',tags:'',fields:{}}}));setCategory(type);setSelected(id);setDetail(null)}
+ const create=(type:ContentCategory=category)=>{const id=crypto.randomUUID();switchDraft(id,type,{id,category:type,name:'',requirements:'',worldId:props.world?.id || '',tags:'',fields:{},dirty:false})}
  const open=async(id:string)=>{setLoading(true);setError('');try{setDetail(await api.getRemoteArchive(id))}catch(e){setError(message(e))}finally{setLoading(false)}}
  const worldFor=(item:Draft)=>worlds.find(w=>w.id===item.worldId)
  const archiveFor=(item:Draft)=>({id:item.id,name:item.name,summary:item.design?.summary || item.requirements,profile:{category:item.category,worldId:item.worldId,world:worldFor(item)?.profile || null,tags:item.tags.split(/[,，]/).map(x=>x.trim()).filter(Boolean),relatedIds:item.relatedIds || [],design:item.design || {name:item.name,summary:item.requirements,fields:item.fields},requirements:item.requirements}})
@@ -41,7 +44,7 @@ export function ContentWorkspace(props:Props) {
    const prompt=item.asset && {id:item.promptId || `prompt:${item.id}`,prompt:item.asset.promptEn,promptZh:item.asset.promptZh,negativePrompt:item.asset.negativePrompt,provider:item.promptProvider || props.provider,modelId:item.promptModel || props.model,snapshot:{category:item.category,design:item.design,asset:item.asset,world:worldFor(item)}}
    await api.saveRemoteArchive({archive:archiveFor(item),prompts:prompt?[prompt]:[]})
  }
- const saveDraft=async()=>{if(!draft)return;update(draft.id,{busy:true,error:'',notice:''});try{await save(draft);update(draft.id,{notice:'已保存到资产库'});await reload()}catch(e){update(draft.id,{error:message(e)})}finally{update(draft.id,{busy:false})}}
+ const saveDraft=async()=>{if(!draft)return;const validation=validateDraftName(draft.name);if(!validation.valid){update(draft.id,{error:validation.message});return}update(draft.id,{busy:true,error:'',notice:''});try{await save(draft);update(draft.id,{notice:'已保存到资产库',saved:true,dirty:false,savedSnapshot:{...draft,savedSnapshot:undefined,dirty:false,saved:true}});await reload()}catch(e){update(draft.id,{error:message(e)})}finally{update(draft.id,{busy:false})}}
  const generate=async()=>{
   if(!draft || draft.busy)return
   const item={...draft},requestId=crypto.randomUUID()
@@ -71,8 +74,8 @@ export function ContentWorkspace(props:Props) {
  const saveCurrentWorld=async()=>{
   if(!props.world)return
   try{
-   const key='npc-forge-current-world-id';let id=localStorage.getItem(key);if(!id){id=crypto.randomUUID();localStorage.setItem(key,id)}
-   await api.saveWorld({id,name:props.world.name,profile:{...props.world}});await reload();if(draft)update(draft.id,{worldId:id})
+   const key='npc-forge-current-world-id';let id=props.world.id || localStorage.getItem(key);if(!id){id=crypto.randomUUID();localStorage.setItem(key,id)}
+   await api.saveWorld({id,name:props.world.name,profile:{...props.world}});await reload();if(draft)update(draft.id,{worldId:props.world.id || id})
   }catch(e){setError(message(e))}
  }
  const resume=(item:RemoteArchiveDetail,promptId?:string)=>{
@@ -83,7 +86,7 @@ export function ContentWorkspace(props:Props) {
   const snapshot=record?.snapshot?.asset as ArtAssetPrompt|undefined
   const asset=snapshot || (record?{type:categoryLabel(cat),style:'',objects:[],composition:'',palette:'',lighting:'',details:[],format:'png',aspectRatio:'1:1',promptZh:record.promptZh || '',promptEn:record.prompt,negativePrompt:record.negativePrompt}:undefined)
   const value:Draft={id:item.archive.id,name:item.archive.name,category:cat,requirements:String(profile.requirements || item.archive.summary),worldId:item.archive.worldId || '',tags:(item.archive.tags || []).join('，'),relatedIds:item.archive.relatedIds || [],fields:design?.fields || {},design,asset,promptId:crypto.randomUUID(),promptProvider:record?.provider,promptModel:record?.modelId}
-  setDrafts(old=>({...old,[value.id]:value}));setSelected(value.id);setCategory(cat);setDetail(null);setEditorOpen(true)
+  value.saved=true;value.dirty=false;value.savedSnapshot={...value};switchDraft(value.id,cat,value);setEditorOpen(true)
  }
  const worldEntries=worlds.map(item=>({id:item.id,name:item.name,summary:String(item.profile.summary||''),profile:{...item.profile,category:'world'},category:'world',worldId:item.id,worldName:item.name,tags:[],updatedAt:item.updatedAt,promptCount:0,imageCount:0,byteCount:0}))
  const library=buildContentLibrary([...worldEntries,...archives],{category:filter,worldId:worldFilter,query,status})
@@ -91,14 +94,17 @@ export function ContentWorkspace(props:Props) {
  const deleteWorldEntry=async(item:any)=>{const count=archives.filter(archive=>archive.worldId===item.id&&archive.category==='character').length;if(!window.confirm(`删除世界观“${item.name}”？${count} 个关联角色将保留并转为独立角色。`))return;setLoading(true);setError('');try{await api.deleteWorld(item.id);await reload()}catch(e){setError(message(e));setLoading(false)}}
  return <div className="content-workspace">
   <section className="hero-card"><div><div className="panel-label">GAME CONTENT</div><h2>{props.mode==='library'?'游戏资产库':props.mode==='images'?'分类文生图':'游戏内容工作室'}</h2><p>角色、地图、场景和道具，按世界与条目保存设计和生成历史。</p></div></section>
+  {pendingSwitch && <section className="panel" role="dialog" aria-modal="true" aria-label="未保存的条目"><h3>当前条目有未保存修改</h3><p>保留会留在本地草稿；保存到资产库需要点击“保存条目”。</p>{(['keep','discard','cancel'] as const).map((decision,index)=><button key={decision} className="choice" onClick={()=>switchDraft(pendingSwitch.targetId,pendingSwitch.category,pendingSwitch.fresh,decision)}>{['保留草稿并切换','放弃修改并切换','取消切换'][index]}</button>)}</section>}
   {error && <div className="error-box" role="alert">{error}<button className="choice" onClick={()=>void reload()}>重试加载</button></div>}
   {detail ? <ContentItemDetail key={detail.archive.id} detail={detail} worlds={worlds} archives={archives} api={api} onBack={()=>{setDetail(null);void reload()}} onReload={()=>open(detail.archive.id)} onResume={resume}/> : <>
    {(props.mode!=='library' || editorOpen) && <section className="panel content-editor">
-    <nav className="content-category-picker" aria-label="内容类别">{Object.entries(contentCategories).map(([id,value])=><button key={id} type="button" className={`choice ${category===id?'is-active':''}`} onClick={()=>{setCategory(id as ContentCategory);const match=Object.values(drafts).find(d=>d.category===id);if(match)setSelected(match.id);else create(id as ContentCategory)}}>{value.label}</button>)}</nav>
-    <div className="content-toolbar"><select aria-label="当前内容条目" value={selected} onChange={e=>{setSelected(e.target.value);setCategory(drafts[e.target.value].category)}}><option value="" disabled>选择草稿或新建条目</option>{Object.values(drafts).filter(d=>d.category===category).map(d=><option key={d.id} value={d.id}>{d.name || '未命名草稿'}{d.busy?' · 生成中':''}</option>)}</select><button className="choice" onClick={()=>create()}>新建{categoryLabel(category)}</button></div>
+    <nav className="content-category-picker" aria-label="内容类别">{Object.entries(contentCategories).map(([id,value])=><button key={id} type="button" className={`choice ${category===id?'is-active':''}`} onClick={()=>{const match=Object.values(drafts).find(d=>d.category===id);if(match)switchDraft(match.id,id as ContentCategory);else create(id as ContentCategory)}}>{value.label}</button>)}</nav>
+    <div className="content-toolbar"><select aria-label="当前内容条目" value={selected} onChange={e=>{switchDraft(e.target.value,drafts[e.target.value].category)}}><option value="" disabled>选择草稿或新建条目</option>{Object.values(drafts).filter(d=>d.category===category).map(d=><option key={d.id} value={d.id}>{draftLabel(d)}{d.busy?' · 生成中':''}</option>)}</select><button className="choice" onClick={()=>create()}>新建{categoryLabel(category)}</button></div>
     {!draft?<p>选择类别并新建条目，开始设计。</p>:<>
-     <label>条目名称<input value={draft.name} disabled={draft.busy} onChange={e=>update(draft.id,{name:e.target.value})}/></label>
-     <label>所属世界<select value={draft.worldId} disabled={draft.busy} onChange={e=>update(draft.id,{worldId:e.target.value})}><option value="">独立素材</option>{worlds.map(w=><option key={w.id} value={w.id}>{w.name}</option>)}</select></label>
+     <label>条目名称<input placeholder={`为这个${categoryLabel(draft.category)}起一个名称`} value={draft.name} disabled={draft.busy} onChange={e=>update(draft.id,{name:e.target.value})}/></label>
+     <p className="section-hint">在上方填写名称即可命名；保存条目后进入资产库，之后仍可重命名。{draft.busy?'生成中，完成后可修改。':''}</p>
+     <label>所属世界<select value={draft.worldId} disabled={draft.busy} onChange={e=>update(draft.id,{worldId:e.target.value})}><option value="">暂不关联世界</option>{worlds.map(w=><option key={w.id} value={w.id}>{w.name}</option>)}</select></label>
+     <p className="section-hint">{draft.worldId?'生成将继承所选世界的规则与视觉方向。':'可先单独创作，之后再关联世界。'}{!worlds.length && !props.world?' 暂无可选世界，请先前往世界构建创建并保存世界。':''}</p>
      {props.world && <button className="choice" onClick={()=>void saveCurrentWorld()}>使用当前世界：{props.world.name}</button>}
      <label>设计需求<textarea value={draft.requirements} disabled={draft.busy} onChange={e=>update(draft.id,{requirements:e.target.value})} placeholder={`描述${categoryLabel(draft.category)}的用途、风格和具体要求…`}/></label>
      <details><summary>补充{categoryLabel(draft.category)}设计细节（可选）</summary>{Object.entries(contentCategories[draft.category].fields).map(([key,label])=><label key={key}>{label}<textarea disabled={draft.busy} value={draft.fields[key] || ''} onChange={e=>update(draft.id,{fields:{...draft.fields,[key]:e.target.value}})}/></label>)}</details>
@@ -112,7 +118,7 @@ export function ContentWorkspace(props:Props) {
    </section>}
    <section className="panel"><h3>已保存资产</h3><div className="content-toolbar"><input aria-label="搜索资产" placeholder="搜索名称、摘要、标签" value={query} onChange={e=>setQuery(e.target.value)}/><select aria-label="世界筛选" value={worldFilter} onChange={e=>setWorldFilter(e.target.value)}><option value="">全部世界</option><option value="independent">独立素材</option>{worlds.map(w=><option key={w.id} value={w.id}>{w.name}</option>)}</select><select aria-label="生产状态" value={status} onChange={e=>setStatus(e.target.value)}><option value="">全部状态</option><option value="design">仅设计</option><option value="prompt">已有 Prompt</option><option value="image">已有图片</option></select></div>
     <nav className="content-category-picker" aria-label="资产类别筛选"><button className={`choice ${!filter?'is-active':''}`} onClick={()=>setFilter('')}>全部</button>{['world','character','map','scene','prop','unknown'].map(c=><button key={c} className={`choice ${filter===c?'is-active':''}`} onClick={()=>setFilter(c)}>{libraryCategoryLabel(c)} {library.counts[c]}</button>)}</nav>
-    {loading?<p>正在加载资产…</p>:error?<p>资产暂时无法加载，请重试。</p>:!library.items.length?<p>当前筛选下没有资产。</p>:<div className="library-grid">{library.items.map((item:any)=><article className="asset-card content-asset-card asset-card-button" key={item.id} role="button" tabIndex={0} onClick={()=>void openLibraryItem(item)} onKeyDown={event=>{if(event.key==='Enter'||event.key===' ')void openLibraryItem(item)}}>{item.coverUrl?<img className="asset-preview asset-image-preview" src={item.coverUrl} alt={item.name}/>:<div className="asset-preview">{libraryCategoryLabel(item.category||'')}</div>}<h3>{item.name}</h3><small>{libraryCategoryLabel(item.category||'')} · {item.category==='world'?`${String(item.profile?.genre||'未设置类型')} · ${String(item.profile?.era||'未设置时代')}`:worlds.find(w=>w.id===item.worldId)?.name||item.worldName||'独立角色'}</small><p>{item.summary}</p>{item.category==='world'?<><small>{archives.filter(archive=>archive.worldId===item.id&&archive.category==='character').length} 个关联角色</small><button className="choice asset-delete" onClick={event=>{event.stopPropagation();void deleteWorldEntry(item)}}>删除世界观</button></>:<small>{item.promptCount||0} 条 Prompt · {item.imageCount} 张图片</small>}{item.nearestExpiry&&<small>{new Date(item.nearestExpiry).toLocaleDateString('zh-CN')} 起清理图片</small>}</article>)}</div>}
+    {loading?<p>正在加载资产…</p>:error?<p>资产暂时无法加载，请重试。</p>:!library.items.length?<p>当前筛选下没有资产。</p>:<div className="library-grid">{library.items.map((item:any)=><article className="asset-card content-asset-card asset-card-button" key={item.id} role="button" tabIndex={0} onClick={()=>void openLibraryItem(item)} onKeyDown={event=>{if(event.key==='Enter'||event.key===' ')void openLibraryItem(item)}}>{item.coverUrl?<img className="asset-preview asset-image-preview" src={item.coverUrl} alt={item.name}/>:<div className="asset-preview">{libraryCategoryLabel(item.category||'')}</div>}<h3>{item.name}</h3><small>{libraryCategoryLabel(item.category||'')} · {item.category==='world'?`${String(item.profile?.genre||'未设置类型')} · ${String(item.profile?.era||'未设置时代')}`:worlds.find(w=>w.id===item.worldId)?.name||item.worldName||'暂未关联世界'}</small><p>{item.summary}</p>{item.category==='world'?<><small>{archives.filter(archive=>archive.worldId===item.id&&archive.category==='character').length} 个关联角色</small><button className="choice asset-delete" onClick={event=>{event.stopPropagation();void deleteWorldEntry(item)}}>删除世界观</button></>:<small>{item.promptCount||0} 条 Prompt · {item.imageCount} 张图片</small>}{item.nearestExpiry&&<small>{new Date(item.nearestExpiry).toLocaleDateString('zh-CN')} 起清理图片</small>}</article>)}</div>}
    </section>
   </>}
  </div>
