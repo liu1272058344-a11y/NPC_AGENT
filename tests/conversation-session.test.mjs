@@ -18,3 +18,12 @@ test('restore keeps failed input, clears pending work, and language handoff keep
  const restored=restoreConversationSessions({c:s}).c;assert.equal(restored.pendingRequest,undefined);assert.equal(restored.input,'新的需求');assert.equal(restored.failedMessageId,'u')
  assert.equal(conversationImageHandoff(s,'en').prompt,' tree \n');assert.equal(conversationImageHandoff(s,'zh').prompt,'古树')
 })
+import {conversationReply} from '../src/content/conversationSession.mjs'
+test('preview replies stay readable and fresh prompt refers to produced revision',()=>{
+ assert.match(conversationReply({status:'needs_clarification',question:'更偏向自然还是机械？'}),/自然/)
+ assert.doesNotMatch(conversationReply({design:{name:'石头',summary:'保存记忆'}}),/^\{/)
+ let s=beginConversationTurn(createConversationSession('prop',null,()=> 'p'),'石头','r')
+ s=completeConversationTurn(s,'r',{design:{name:'石头',summary:'保存记忆',fields:{}},asset,context:{source:{itemId:'p',itemRevision:1,worldId:'',worldRevision:null,unavailable:false}}})
+ assert.equal(s.context.source.itemRevision,s.revision)
+ assert.throws(()=>conversationImageHandoff(createConversationSession('map')),/先生成/)
+})

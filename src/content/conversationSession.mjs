@@ -21,8 +21,9 @@ export function completeConversationTurn(session,requestId,result){
  const base={...session,messages,pendingRequest:undefined,failedMessageId:undefined,error:undefined,input:'',options:result.options || result.suggestions || [],updatedAt:new Date().toISOString()}
  if(result.status==='needs_clarification')return base
  const revision=session.revision+1,worldValue=result.world?{...result.world,id:session.id}:session.worldValue
+ const context=result.context?{...result.context,source:{...result.context.source,itemId:session.id,itemRevision:revision}}:session.context
  const design=result.design?{...result.design,fields:{...session.design?.fields,...result.design.fields}}:session.design
- return {...base,revision,name:result.world?.name || design?.name || session.name,worldValue,design,asset:result.asset || session.asset,context:result.context || session.context,promptId:result.asset?`prompt:${requestId}`:session.promptId,promptMode:result.asset?'generated':session.promptMode,promptSnapshot:result.asset?structuredClone({category:session.kind,mode:'generated',design,asset:result.asset,context:result.context,world:result.context?.confirmed?.world,messages}):session.promptSnapshot,status:session.status==='saved'?'dirty':session.status}
+ return {...base,revision,name:result.world?.name || design?.name || session.name,worldValue,design,asset:result.asset || session.asset,context,promptId:result.asset?`prompt:${requestId}`:session.promptId,promptMode:result.asset?'generated':session.promptMode,promptSnapshot:result.asset?structuredClone({category:session.kind,mode:'generated',design,asset:result.asset,context,world:context?.confirmed?.world,messages}):session.promptSnapshot,status:session.status==='saved'?'dirty':session.status}
 }
 export function failConversationTurn(session,requestId,error){
  if(session.pendingRequest?.id!==requestId)return session
