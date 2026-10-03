@@ -8,3 +8,4 @@ export function imageSavePayload(result,target=null,name='自由创作') {
  return {archive,sourceUrl:result.image.url,idempotencyKey:`content-image:${request.requestId}`,prompt:{id:`image-prompt:${request.requestId}:${archive.id}`,prompt:request.prompt,negativePrompt:request.negativePrompt,provider:request.provider,modelId:request.model,snapshot:{...request,size:result.image.size}},provider:request.provider,modelId:request.model}
 }
 export const canGenerateImage = ({generating,saving,prompt}) => !generating && !saving && !!prompt?.trim()
+export const canSaveImage = ({generating,saving,saved,hasResult,targetId,targets}) => !generating && !saving && !saved && hasResult && (!targetId || targets.some(item=>item.id===targetId))

@@ -5,6 +5,6 @@ export function createStudioHandoff(input,idFactory=()=>crypto.randomUUID()) {
 export function receiveStudioHandoff(state,incoming,decision) {
  if(!incoming || state.consumedId===incoming.id)return {state,needsDecision:false}
  if(decision==='cancel')return {state:{...state,consumedId:incoming.id,pending:null},needsDecision:false}
- if((state.dirty||state.hasUnsavedImage)&&decision!=='replace')return {state:{...state,pending:incoming},needsDecision:true}
+ if((state.dirty||state.hasUnsavedImage||state.generating||state.saving)&&decision!=='replace')return {state:{...state,pending:incoming},needsDecision:true}
  return {state:{...state,...incoming,consumedId:incoming.id,pending:null,dirty:false,hasUnsavedImage:false},needsDecision:false}
 }

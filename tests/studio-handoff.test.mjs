@@ -12,3 +12,4 @@ test('handoff is consumed once and replacement protects edits and results',()=>{
  const accepted=receiveStudioHandoff(state,next,'replace');assert.equal(accepted.state.prompt,'new');assert.equal(accepted.state.consumedId,'next')
  assert.equal(accepted.state.hasUnsavedImage,false)
 })
+test('incoming handoff waits while generation or save is in flight',()=>{const next=createStudioHandoff({prompt:'new'});assert.equal(receiveStudioHandoff({prompt:'old',generating:true},next).needsDecision,true);assert.equal(receiveStudioHandoff({prompt:'old',saving:true},next).needsDecision,true)})
