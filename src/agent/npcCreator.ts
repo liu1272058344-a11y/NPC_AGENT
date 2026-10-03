@@ -76,6 +76,9 @@ export const sanitizeCreatorReply = (value: unknown): CreatorReply => {
     const world = {} as WorldProfile
     for (const field of worldFields) if (typeof candidate[field] === 'string') world[field] = candidate[field] as string
     if (typeof candidate.id === 'string') world.id = candidate.id
+    if (typeof candidate.id === 'string') world.id = candidate.id
+    if (typeof candidate.visualDirection === 'string') world.visualDirection = candidate.visualDirection
+    if (typeof candidate.revision === 'number') world.revision = candidate.revision
     if (Object.keys(world).length > 0) reply.world = world
   }
   if (source.npc && typeof source.npc === 'object') {
