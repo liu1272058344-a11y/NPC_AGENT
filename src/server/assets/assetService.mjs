@@ -1,3 +1,4 @@
+import { isDeepStrictEqual } from 'node:util'
 import { createHash, randomUUID } from 'node:crypto'
 import { ASSET_LIMITS, expiresAtFrom } from './config.mjs'
 import { fetchSourceImage } from './sourceImage.mjs'
@@ -29,6 +30,8 @@ async function validateArchive(db,workspaceId,archive) {
 
 export const createAssetService = ({ db, blob, source = fetchSourceImage, now = () => new Date(), uuid = randomUUID }) => ({
   async saveGeneratedImage(input) {
+    const existing = db.getArchiveDetail ? await db.getArchiveDetail(input.workspaceId,input.archive.id) : null
+    if(existing) input={...input,archive:normalizeArchive(existing.archive)}
     await validateArchive(db,input.workspaceId,input.archive)
     await db.ensureWorkspace(input.workspaceId)
     const duplicate = await db.findByIdempotencyKey(input.workspaceId, input.idempotencyKey)
@@ -61,7 +64,16 @@ export const createAssetService = ({ db, blob, source = fetchSourceImage, now = 
   async saveArchive(workspaceId, input) { await validateArchive(db,workspaceId,input.archive); await db.ensureWorkspace(workspaceId); const archive = await db.upsertArchive(workspaceId, input.archive); for (const prompt of input.prompts || []) await db.insertPrompt(workspaceId, input.archive.id, prompt); return { archive: normalizeArchive(archive) } },
   async listWorlds(workspaceId) { return (await db.listWorlds(workspaceId)).map(normalizeWorld) },
   async getWorld(workspaceId,id) { if (typeof id !== 'string' || !id.trim()) throw invalid('世界标识无效。'); return normalizeWorld(await db.findWorld(workspaceId,id)) },
-  async saveWorld(workspaceId,world) { if (!world?.id || !world?.name) throw invalid('世界名称与标识必填。'); await db.ensureWorkspace(workspaceId); return normalizeWorld(await db.upsertWorld(workspaceId,world)) },
+  async saveWorld(workspaceId,world) {
+    if (!world?.id || !world?.name) throw invalid('世界名称与标识必填。')
+    await db.ensureWorkspace(workspaceId)
+    const previous = db.findWorld ? normalizeWorld(await db.findWorld(workspaceId,world.id)) : null
+    const {revision: _requested, ...nextProfile} = world.profile || {}
+    const {revision: _previous, ...oldProfile} = previous?.profile || {}
+    const changed = !isDeepStrictEqual({...oldProfile,name:previous?.name},{...nextProfile,name:world.name})
+    const revision = previous ? Number(previous.profile.revision || 1) + (changed ? 1 : 0) : 1
+    return normalizeWorld(await db.upsertWorld(workspaceId,{...world,profile:{...nextProfile,revision}}))
+  },
   async deleteWorld(workspaceId,id) { if (typeof id !== 'string' || !id.trim()) throw invalid('世界标识无效。'); return db.deleteWorld(workspaceId,id) },
   async updateArchiveMetadata(workspaceId,id,patch) {
     const detail=await db.getArchiveDetail(workspaceId,id)

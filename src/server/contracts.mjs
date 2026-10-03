@@ -4,7 +4,7 @@ const text = z.string().trim().min(1)
 const list = z.array(text).min(1)
 
 export const worldSchema = z.object({
-  name: text, genre: text, era: text, atmosphere: text, coreRule: text, centralConflict: text, summary: text
+  name: text, genre: text, era: text, atmosphere: text, coreRule: text, centralConflict: text, summary: text, id: text.optional(), revision: z.number().int().positive().optional(), visualDirection: z.string().optional()
 }).strict()
 
 export const npcSchema = z.object({

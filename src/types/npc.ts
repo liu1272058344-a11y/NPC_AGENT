@@ -14,6 +14,8 @@ export interface NPC {
 }
 
 export interface WorldProfile {
+  revision?: number
+  visualDirection?: string
   id?: string
   name: string
   genre: string

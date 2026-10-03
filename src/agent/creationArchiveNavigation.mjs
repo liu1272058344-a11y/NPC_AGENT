@@ -1,4 +1,4 @@
-const worldFields=['name','genre','era','atmosphere','coreRule','centralConflict','summary']
+const worldFields=['name','genre','era','atmosphere','coreRule','centralConflict','summary','visualDirection','revision']
 const npcFields=['name','role','world','function','summary','background','goal','speechStyle','sourcePrompt','personality','behaviorRules']
 const pick=(source,fields)=>Object.fromEntries(fields.filter(key=>source[key]!==undefined).map(key=>[key,source[key]]))
 

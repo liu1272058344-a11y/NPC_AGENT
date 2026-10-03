@@ -1,3 +1,4 @@
+import { isDeepStrictEqual } from 'node:util'
 const usage = (row = {}) => ({ imageCount: Number(row.image_count || 0), byteCount: Number(row.byte_count || 0) })
 
 export const createAssetDatabase = (query) => ({
@@ -54,6 +55,7 @@ export const createAssetDatabase = (query) => ({
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb) ON CONFLICT (workspace_id,id) DO NOTHING RETURNING *`,values)
     const row=result.rows[0] || (await query('SELECT * FROM prompt_records WHERE workspace_id=$1 AND id=$2',[workspaceId,prompt.id])).rows[0]
     if (row?.archive_id && row.archive_id !== archiveId) throw Object.assign(new Error('Prompt 已属于其他条目。'),{statusCode:409})
+    if (!result.rows[0] && row && (row.prompt !== prompt.prompt || (row.negative_prompt || '') !== (prompt.negativePrompt || '') || (row.prompt_zh || '') !== (prompt.promptZh || '') || (row.provider || '') !== (prompt.provider || '') || (row.model_id || '') !== (prompt.modelId || '') || !isDeepStrictEqual(row.snapshot_json || {},JSON.parse(JSON.stringify(prompt.snapshot || {}))))) throw Object.assign(new Error('该 Prompt 版本已保存，请创建新版本后修改。'),{statusCode:409})
     return row
   },
   insertImageAsset: async (record) => (await query(`INSERT INTO image_assets (id,workspace_id,archive_id,prompt_record_id,blob_url,pathname,content_type,byte_size,width,height,provider,model_id,created_at,expires_at,idempotency_key)
