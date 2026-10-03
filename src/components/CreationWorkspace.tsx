@@ -21,7 +21,7 @@ export interface CreationWorkspaceProps {
   onNpcChange:(npc:NPC|null)=>void
   onArchiveSaved?:()=>void
   onUnsavedChange?:(hasUnsaved:boolean,states:{world:SaveState;character:SaveState})=>void
-  onCreateContent?:(category:'character'|'map'|'scene'|'prop')=>void
+  onCreateContent?:(category:'character'|'map'|'scene'|'prop'|'clothing')=>void
   onUseForImage?:(kind:CreationKind)=>void
   onCharacterContextChange?:(context:{world:WorldProfile|null;npc:NPC|null;linkWorld:boolean})=>void
 }

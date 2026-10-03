@@ -6,7 +6,7 @@ import { generateStructured } from '../services/llm/llmService.mjs'
 
 const fail = (message, statusCode) => Object.assign(new Error(message), { statusCode, code:statusCode === 400 ? 'INVALID_REQUEST' : 'PROVIDER_SCHEMA_MISMATCH' })
 export function validateContentRequest(input) {
-  if (!contentCategories[input?.category]) throw fail('请选择角色、地图、场景或道具。', 400)
+  if (!contentCategories[input?.category]) throw fail('请选择角色、地图、场景、道具或服饰。', 400)
   for (const field of ['itemId','name','requirements']) if (typeof input[field] !== 'string' || !input[field].trim()) throw fail('请填写条目名称和生成需求。', 400)
   return input
 }
