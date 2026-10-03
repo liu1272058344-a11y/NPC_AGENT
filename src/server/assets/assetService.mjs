@@ -1,3 +1,4 @@
+import { isDeepStrictEqual } from 'node:util'
 import { createHash, randomUUID } from 'node:crypto'
 import { ASSET_LIMITS, expiresAtFrom } from './config.mjs'
 import { fetchSourceImage } from './sourceImage.mjs'
@@ -29,6 +30,8 @@ async function validateArchive(db,workspaceId,archive) {
 
 export const createAssetService = ({ db, blob, source = fetchSourceImage, now = () => new Date(), uuid = randomUUID }) => ({
   async saveGeneratedImage(input) {
+    const existing = db.getArchiveDetail ? await db.getArchiveDetail(input.workspaceId,input.archive.id) : null
+    if(existing) input={...input,archive:normalizeArchive(existing.archive)}
     await validateArchive(db,input.workspaceId,input.archive)
     await db.ensureWorkspace(input.workspaceId)
     const duplicate = await db.findByIdempotencyKey(input.workspaceId, input.idempotencyKey)
@@ -67,7 +70,7 @@ export const createAssetService = ({ db, blob, source = fetchSourceImage, now = 
     const previous = db.findWorld ? normalizeWorld(await db.findWorld(workspaceId,world.id)) : null
     const {revision: _requested, ...nextProfile} = world.profile || {}
     const {revision: _previous, ...oldProfile} = previous?.profile || {}
-    const changed = JSON.stringify({...oldProfile,name:previous?.name}) !== JSON.stringify({...nextProfile,name:world.name})
+    const changed = !isDeepStrictEqual({...oldProfile,name:previous?.name},{...nextProfile,name:world.name})
     const revision = previous ? Number(previous.profile.revision || 1) + (changed ? 1 : 0) : 1
     return normalizeWorld(await db.upsertWorld(workspaceId,{...world,profile:{...nextProfile,revision}}))
   },

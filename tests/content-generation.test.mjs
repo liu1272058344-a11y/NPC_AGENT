@@ -8,7 +8,7 @@ for (const category of ['character', 'map', 'scene', 'prop']) {
     const result = await generateContent({ category, itemId:'item-1', name:'测试', requirements:'完整需求', model:'chosen-model', key:'test', provider:'deepseek' }, { requestStructured: async (request) => {
       assert.equal(request.model, 'chosen-model')
       assert.equal(request.messages[0].content, '完整需求')
-      const fields = Object.keys(request.schema.properties.design.properties.fields.properties)
+      const fields = Object.keys(request.schema.anyOf.find(schema=>schema.properties.design).properties.design.properties.fields.properties)
       return { category, design:{ name:'测试', summary:'摘要', fields:Object.fromEntries(fields.map(field => [field, '具体内容'])) }, asset }
     } })
     assert.equal(result.itemId, 'item-1')
