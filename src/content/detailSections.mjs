@@ -1,0 +1,5 @@
+import {contentCategories} from './categories.mjs'
+const worldLabels={genre:'玩法与游戏类型',era:'时代背景',atmosphere:'整体氛围',coreRule:'核心规则',centralConflict:'主要冲突',summary:'世界概述',visualDirection:'视觉方向'}
+const npcLabels={role:'身份',function:'游戏功能',background:'背景',goal:'目标',personality:'性格',behaviorRules:'行为规则',speechStyle:'表达方式',sourcePrompt:'原始需求'}
+const toText=value=>Array.isArray(value)?value.join('、'):typeof value==='object'?JSON.stringify(value):String(value ?? '')
+export function designSections(archive){const p=archive.profile || {},labels=archive.category==='world'?worldLabels:contentCategories[archive.category]?.fields || {},fields=archive.category==='world'?p:p.design?.fields || p.fields || {};return [...Object.entries(fields).filter(([k])=>archive.category!=='world'||worldLabels[k]).map(([key,value])=>({key,label:labels[key] || key,value:toText(value)})),...Object.entries(npcLabels).filter(([key])=>p[key]!==undefined&&!fields[key]).map(([key,label])=>({key,label,value:toText(p[key])}))].filter(row=>row.value)}

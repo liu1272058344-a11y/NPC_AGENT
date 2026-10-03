@@ -1,2 +1,2 @@
-export const studioNavigation=[{id:'Project Overview',label:'项目总览'},{id:'Game Design',label:'游戏设定'},{id:'World Builder',label:'世界构建'},{id:'Character Studio',label:'游戏内容工作室'},{id:'Image Generation',label:'文生图工作台'},{id:'Asset Library',label:'资产库'},{id:'Export Center',label:'导出中心'},{id:'Settings',label:'设置'}]
-export const resolveStudioPage=id=>id==='Image Generation'?'images':id==='Character Studio'||id==='Visual Production'?'studio':id==='Asset Library'?'library':null
+export const studioNavigation=[{id:'Project Overview',label:'项目总览'},{id:'World Builder',label:'游戏内容构建'},{id:'Character Studio',label:'游戏内容工作室'},{id:'Image Generation',label:'文生图工作台'},{id:'Asset Library',label:'资产库'},{id:'Export Center',label:'导出中心'},{id:'Settings',label:'设置'}]
+export const resolveStudioPage=id=>id==='World Builder'||id==='Game Design'?'builder':id==='Image Generation'?'images':id==='Character Studio'||id==='Visual Production'?'studio':id==='Asset Library'?'library':null
