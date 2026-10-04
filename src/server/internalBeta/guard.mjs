@@ -12,7 +12,7 @@ export async function guardBetaRequest(request, { env = process.env, role = 'tes
   const session = requireBetaSession(request, env, role)
   if (costKind && session.sessionId !== 'local-development') {
     const store = await createStore(env)
-    await store.reserveDailyAction(costKind)
+    await store.reserveDailyAction(costKind, { unlimited: session.role === 'admin' })
   }
   return session
 }

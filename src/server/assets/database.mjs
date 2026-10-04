@@ -32,8 +32,8 @@ export const createAssetDatabase = (query) => ({
       FROM workspaces w CROSS JOIN internal_beta_project_usage p CROSS JOIN locked WHERE w.id=$1 AND p.id=1 FOR UPDATE
     ), project_update AS (
       UPDATE internal_beta_project_usage p SET image_count=p.image_count+1, byte_count=p.byte_count+$2
-      FROM current c WHERE p.id=1 AND c.image_count < $3 AND c.byte_count+$2 <= $4
-        AND c.project_images < $5 AND c.project_bytes+$2 <= $6 RETURNING p.id
+      FROM current c WHERE p.id=1 AND ($3::bigint IS NULL OR c.image_count < $3) AND ($4::bigint IS NULL OR c.byte_count+$2 <= $4)
+        AND ($5::bigint IS NULL OR c.project_images < $5) AND ($6::bigint IS NULL OR c.project_bytes+$2 <= $6) RETURNING p.id
     ) UPDATE workspaces w SET image_count=w.image_count+1, byte_count=w.byte_count+$2, last_seen_at=NOW()
       FROM current c, project_update p WHERE w.id=c.id RETURNING w.image_count, w.byte_count`, [workspaceId, byteSize, limits.maxImages, limits.maxBytes, limits.projectMaxImages, limits.projectMaxBytes])
     if (result.rows[0]) return usage(result.rows[0])

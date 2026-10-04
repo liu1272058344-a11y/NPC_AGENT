@@ -27,6 +27,16 @@ test('database exposes an atomic quota reservation transaction', async () => {
   assert.match(calls[0].text, /FOR UPDATE/)
 })
 
+test('unlimited image reservation still atomically increments workspace and project counters',async()=>{
+ const calls=[],db=createAssetDatabase(async(text,values)=>{calls.push({text,values});return {rows:[{image_count:'201',byte_count:'2147483651'}]}})
+ const result=await db.reserveQuota('workspace-admin',3,{maxImages:null,maxBytes:null,projectMaxImages:null,projectMaxBytes:null})
+ assert.deepEqual(result,{imageCount:201,byteCount:2147483651})
+ assert.deepEqual(calls[0].values,['workspace-admin',3,null,null,null,null])
+ assert.match(calls[0].text,/UPDATE internal_beta_project_usage/)
+ assert.match(calls[0].text,/UPDATE workspaces/)
+ for(const index of [3,4,5,6])assert.ok(calls[0].text.includes(`$${index}::bigint IS NULL OR`))
+})
+
 test('archive and prompt identities are isolated by workspace', async () => {
   const schema = await readFile(new URL('../db/migrations/001_remote_asset_library.sql', import.meta.url), 'utf8')
   assert.match(schema, /PRIMARY KEY \(workspace_id, id\)/)

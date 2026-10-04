@@ -25,6 +25,14 @@ test('saves and deletes images through stable envelopes', async () => {
   assert.deepEqual(deleted.body, { ok: true, data: { deleted: true } })
 })
 
+test('image quota exemption comes only from the verified server session',async()=>{
+ const guardedService={...service,saveGeneratedImage:async(body,options)=>({unlimited:options?.unlimited===true,workspaceId:body.workspaceId})}
+ for(const role of ['admin','tester',undefined]){
+  const result=await handleAssetRequest({method:'POST',action:'images',headers:{'x-workspace-id':workspaceId},session:{role},body:{role:'admin',unlimited:true,session:{role:'admin'}}},guardedService)
+  assert.equal(result.body.data.unlimited,role==='admin')
+ }
+})
+
 test('maps service errors to the public error envelope', async () => {
   const failing = { ...service, listArchiveSummaries: async () => { throw Object.assign(new Error('数据库离线'), { code: 'ASSET_STORAGE_UNAVAILABLE', statusCode: 503 }) } }
   const result = await handleAssetRequest({ method: 'GET', headers: { 'x-workspace-id': workspaceId } }, failing)

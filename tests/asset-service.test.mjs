@@ -62,6 +62,17 @@ test('marks usage near either quota at eighty percent', async () => {
   assert.equal(result.nearLimit, true)
 })
 
+test('admin image saves bypass all count and byte quotas while retaining usage accounting',async()=>{
+ const {service,db}=harness({imageCount:200,byteCount:2*1024*1024*1024})
+ db.reserveQuota=async(_workspaceId,byteSize,limits)=>{
+  if([limits.maxImages,limits.maxBytes,limits.projectMaxImages,limits.projectMaxBytes].some(limit=>limit!==null))throw Object.assign(new Error('quota'),{code:'QUOTA_COUNT_EXCEEDED'})
+  return {imageCount:201,byteCount:2*1024*1024*1024+byteSize}
+ }
+ const result=await service.saveGeneratedImage(input,{unlimited:true})
+ assert.equal(result.usage.imageCount,201);assert.equal(result.nearLimit,false)
+ await assert.rejects(service.saveGeneratedImage({...input,unlimited:true,role:'admin'}),{code:'QUOTA_COUNT_EXCEEDED'})
+})
+
 test('returns the winner of a concurrent duplicate save', async () => {
   const { service, db, deleted, released } = harness()
   let lookups = 0

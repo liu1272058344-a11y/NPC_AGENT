@@ -11,7 +11,7 @@ const normalizeImage = (row) => ({
   provider: row.provider, modelId: row.modelId || row.model_id, createdAt: row.createdAt || row.created_at, expiresAt: row.expiresAt || row.expires_at
 })
 
-const quotaWarning = (usage) => usage.imageCount >= ASSET_LIMITS.maxImages * ASSET_LIMITS.warningRatio || usage.byteCount >= ASSET_LIMITS.maxBytes * ASSET_LIMITS.warningRatio
+const quotaWarning = (usage, unlimited = false) => !unlimited && (usage.imageCount >= ASSET_LIMITS.maxImages * ASSET_LIMITS.warningRatio || usage.byteCount >= ASSET_LIMITS.maxBytes * ASSET_LIMITS.warningRatio)
 const normalizeWorld = (row) => row ? ({ id:row.id,name:row.name,profile:row.profile || row.profile_json || {},updatedAt:row.updatedAt || row.updated_at }) : null
 const normalizeArchive = (row) => {
   const profile=row.profile || row.profile_json || {}
@@ -29,7 +29,7 @@ async function validateArchive(db,workspaceId,archive) {
 }
 
 export const createAssetService = ({ db, blob, source = fetchSourceImage, now = () => new Date(), uuid = randomUUID }) => ({
-  async saveGeneratedImage(input) {
+  async saveGeneratedImage(input, { unlimited = false } = {}) {
     const existing = db.getArchiveDetail ? await db.getArchiveDetail(input.workspaceId,input.archive.id) : null
     if(existing) input={...input,archive:normalizeArchive(existing.archive)}
     await validateArchive(db,input.workspaceId,input.archive)
@@ -37,13 +37,14 @@ export const createAssetService = ({ db, blob, source = fetchSourceImage, now = 
     const duplicate = await db.findByIdempotencyKey(input.workspaceId, input.idempotencyKey)
     if (duplicate) {
       const usage = await db.getWorkspaceUsage(input.workspaceId)
-      return { asset: normalizeImage(duplicate), usage, nearLimit: quotaWarning(usage) }
+      return { asset: normalizeImage(duplicate), usage, nearLimit: quotaWarning(usage, unlimited) }
     }
     const image = await source(input.sourceUrl)
     const id = uuid()
     const createdAt = now().toISOString()
     const pathname = `workspaces/${input.workspaceId}/${id}`
-    const usage = await db.reserveQuota(input.workspaceId, image.byteSize, ASSET_LIMITS)
+    const limits = unlimited ? { ...ASSET_LIMITS, maxImages:null, maxBytes:null, projectMaxImages:null, projectMaxBytes:null } : ASSET_LIMITS
+    const usage = await db.reserveQuota(input.workspaceId, image.byteSize, limits)
     let uploaded
     try {
       uploaded = await blob.putImage(pathname, image.bytes, image.contentType)
@@ -52,12 +53,12 @@ export const createAssetService = ({ db, blob, source = fetchSourceImage, now = 
       await db.insertPrompt(input.workspaceId, input.archive.id, { ...input.prompt, id: promptId })
       const record = { id, workspaceId: input.workspaceId, archiveId: input.archive.id, promptRecordId: promptId, blobUrl: uploaded.url, pathname: uploaded.pathname || pathname, contentType: image.contentType, byteSize: image.byteSize, width: image.width || input.width, height: image.height || input.height, provider: input.provider, modelId: input.modelId, createdAt, expiresAt: expiresAtFrom(now()), idempotencyKey: input.idempotencyKey }
       const saved = await db.insertImageAsset(record)
-      return { asset: normalizeImage(saved), usage, nearLimit: quotaWarning(usage) }
+      return { asset: normalizeImage(saved), usage, nearLimit: quotaWarning(usage, unlimited) }
     } catch (error) {
       if (uploaded?.url) await blob.deleteImage(uploaded.url).catch(() => {})
       await db.releaseQuota(input.workspaceId, image.byteSize).catch(() => {})
       const winner = await db.findByIdempotencyKey(input.workspaceId, input.idempotencyKey).catch(() => null)
-      if (winner) { const current = await db.getWorkspaceUsage(input.workspaceId); return { asset: normalizeImage(winner), usage: current, nearLimit: quotaWarning(current) } }
+      if (winner) { const current = await db.getWorkspaceUsage(input.workspaceId); return { asset: normalizeImage(winner), usage: current, nearLimit: quotaWarning(current, unlimited) } }
       throw error
     }
   },

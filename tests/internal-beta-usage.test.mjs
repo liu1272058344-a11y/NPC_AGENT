@@ -31,3 +31,11 @@ test('environment overrides are validated and usage aggregates are numeric', asy
 test('invalid limit configuration fails closed', () => {
   assert.throws(() => createInternalBetaUsageStore(async () => ({ rows: [] }), { INTERNAL_BETA_DAILY_ACTIONS: '0' }), { code: 'INTERNAL_BETA_NOT_CONFIGURED' })
 })
+
+test('admin usage reports unlimited quotas while preserving project totals',async()=>{
+ const store=createInternalBetaUsageStore(async sql=>({rows:[sql.includes('image_assets')?{image_count:'240',byte_count:'2147483648'}:{action_count:'80'}]}))
+ const usage=await store.getProjectUsage({unlimited:true})
+ assert.equal(usage.unlimited,true)
+ assert.deepEqual(usage.limits,{maxImages:null,maxBytes:null,dailyActions:null})
+ assert.equal(usage.dailyActions,80);assert.equal(usage.imageCount,240)
+})
