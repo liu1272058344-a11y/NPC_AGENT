@@ -50,28 +50,28 @@ test('classifies empty, truncated, and filtered output without an unbounded retr
   }
 })
 
-test('stops invalid JSON repair after three total provider calls', async () => {
+test('stops invalid JSON repair after two total provider calls', async () => {
   let attempts = 0
   await assert.rejects(requestStructured(options(async () => {
     attempts += 1
     return response({ choices: [{ message: { content: '{bad json' }, finish_reason: 'stop' }] })
-  })), (error) => error.code === 'INVALID_SCHEMA')
-  assert.equal(attempts, 3)
+  })), (error) => error.code === 'INVALID_JSON')
+  assert.equal(attempts, 2)
 })
 
-test('retries 429 and succeeds on the next attempt, but does not retry 400', async () => {
+test('reports rate limits without retry and does not retry 400', async () => {
   let attempts = 0
-  const value = await requestStructured(options(async () => { attempts += 1; return attempts === 1 ? response({ error: { message: 'busy' } }, 429) : response({ choices: [{ message: { content: '{"ok":true}' }, finish_reason: 'stop' }] }) }))
-  assert.deepEqual(value, { ok: true }); assert.equal(attempts, 2)
+  await assert.rejects(requestStructured(options(async () => { attempts += 1; return response({ error: { message: 'busy' } }, 429) })), {code:'PROVIDER_RATE_LIMITED'})
+  assert.equal(attempts, 1)
   attempts = 0
   await assert.rejects(requestStructured(options(async () => { attempts += 1; return response({ error: { message: 'bad request' } }, 400) })), (error) => error.code === 'API_ERROR')
   assert.equal(attempts, 1)
 })
 
-test('stops after three total attempts and respects cancellation', async () => {
+test('stops after two total attempts and respects cancellation', async () => {
   let attempts = 0
   await assert.rejects(requestStructured(options(async () => { attempts += 1; return response({ error: { message: 'down' } }, 503) })), (error) => error.code === 'PROVIDER_UNAVAILABLE')
-  assert.equal(attempts, 3)
+  assert.equal(attempts, 2)
   const controller = new AbortController(); controller.abort()
   attempts = 0
   await assert.rejects(requestStructured(options(async () => { attempts += 1; return response({ choices: [{ message: { content: '' }, finish_reason: 'stop' }] }) }, { signal: controller.signal })), (error) => error.code === 'REQUEST_ABORTED')

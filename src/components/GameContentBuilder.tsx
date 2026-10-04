@@ -43,15 +43,18 @@ export function GameContentBuilder({active,sessions,setSessions,selected,onSelec
  }
  const management=<>{draftNotice&&<div className="draft-notice" role="status"><span>{draftNotice}</span>{Object.keys(removed).length>0&&<button className="choice" disabled={saving || pipelineBusy} onClick={undo}>撤销上次删除</button>}</div>}{managing&&<DraftManager sessions={sessions} busy={saving || pipelineBusy} onClose={()=>setManaging(false)} onOpen={id=>{onSelect(id);setManaging(false);setNotice('')}} onRemove={remove} onRename={(id,name)=>{try{update(id,s=>renameDraft(s,name))}catch(e){setDraftNotice(errorMessage(e))}}}/>}</>
  const send=async(text?:string,retry=false)=>{
-  if(!session || session.pendingRequest)return
+  if(!session || session.pendingRequest || requests.current.has(session.id))return
   if(session.kind==='unknown'){setNotice('请先选择内容类型，再继续设计。');return}
-  const requestId=crypto.randomUUID(),controller=new AbortController(),next=retry?retryConversationTurn(session,requestId):beginConversationTurn(session,text ?? session.input,requestId)
+  const requestId=crypto.randomUUID(),controller=new AbortController(),next=structuredClone(retry?retryConversationTurn(session,requestId):beginConversationTurn(session,text ?? session.input,requestId))
   if(!next.pendingRequest)return
   requests.current.set(session.id,controller);update(session.id,()=>({...next,worldSnapshot:liveWorld || next.worldSnapshot}));setNotice('')
-  try{let confirmedWorld=liveWorld
-   if(session.worldId&&localWorld?.status!=='draft')try{const fetched=await api.getWorld(session.worldId);confirmedWorld={...fetched.profile,id:fetched.id,name:fetched.name} as unknown as WorldProfile;setWorlds(old=>[fetched,...old.filter(w=>w.id!==fetched.id)])}catch(e){confirmedWorld=undefined;setWorldError(errorMessage(e));setWorlds(old=>old.filter(w=>w.id!==session.worldId))}
-   const result=await requestConversationTurn(next,{provider,model,world:confirmedWorld,requestId,signal:controller.signal});update(session.id,current=>completeConversationTurn({...current,worldSnapshot:confirmedWorld,promptProvider:provider,promptModel:model},requestId,result))}
-  catch(e){update(session.id,current=>failConversationTurn(current,requestId,errorMessage(e)))}finally{requests.current.delete(session.id)}
+  try{const confirmedWorld=liveWorld ? structuredClone(liveWorld) : undefined
+   if(next.worldId&&!confirmedWorld)throw new Error('来源世界暂不可用，请刷新世界列表或选择“不关联世界”。')
+   const result=await requestConversationTurn(next,{provider,model,world:confirmedWorld,requestId,signal:controller.signal});update(session.id,current=>current.pendingRequest?.id===requestId?completeConversationTurn({...current,worldSnapshot:confirmedWorld,promptProvider:provider,promptModel:model},requestId,result):current)}
+  catch(e){const aborted=controller.signal.aborted || (e as Error)?.name==='AbortError',code=(e as {code?:string})?.code
+   if(import.meta.env.DEV)console.error('[AI_GENERATION_FAILED]',{requestId,designId:next.id,selectedCategoryId:next.kind,sourceWorldId:next.worldId,errorCode:aborted?'REQUEST_ABORTED':code || 'API_ERROR',message:errorMessage(e)})
+   if(code==='STALE_REQUEST')update(session.id,current=>current.pendingRequest?.id===requestId?{...current,pendingRequest:undefined}:current)
+   else update(session.id,current=>failConversationTurn(current,requestId,aborted?'请求已取消。':errorMessage(e)))}finally{if(requests.current.get(session.id)===controller)requests.current.delete(session.id)}
  }
  const save=async()=>{if(!session)return;setSaving(true);setNotice('');try{
   if(session.worldId&&!linked)throw new Error(localWorld?.worldValue?'请先保存来源世界档案，或选择“不关联世界”。':'原关联世界暂不可用，请重新选择世界或取消关联。')

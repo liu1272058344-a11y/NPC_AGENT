@@ -7,7 +7,11 @@ export const normalizeReviewResult = (value: Partial<ReviewResult> | null | unde
   const score = typeof source.score === 'number' && Number.isFinite(source.score) ? source.score : undefined
   return { approved: source.approved === true, issues: strings(source.issues), suggestions: strings(source.suggestions), ...(score === undefined ? {} : { score }) }
 }
-export const parseJsonOutput = (value: unknown): unknown => { const text = String(value ?? '').replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim(); if (!text) throw new Error('模型没有返回内容，请点击重试。'); try { return JSON.parse(text) } catch { const start = text.indexOf('{'); if (start < 0) throw new Error('模型返回内容不完整，请点击重试。'); let depth = 0; let quoted = false; let escaped = false; for (let index = start; index < text.length; index += 1) { const char = text[index]; if (quoted) { if (escaped) escaped = false; else if (char === '\\') escaped = true; else if (char === '"') quoted = false } else if (char === '"') quoted = true; else if (char === '{') depth += 1; else if (char === '}') { depth -= 1; if (depth === 0) { try { return JSON.parse(text.slice(start, index + 1)) } catch { break } } } } const candidate = text.slice(start).replace(/,\s*$/, ''); for (const suffix of ['}', ']}', '}}', ']}']) { try { return JSON.parse(candidate + suffix) } catch { /* truncated output */ } } throw new Error('模型返回内容不完整，请点击重试。') } }
+export const parseJsonOutput = (value: unknown): unknown => {
+  const text = String(value ?? '').replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim()
+  if (!text) throw new GatewayError('EMPTY_RESPONSE', '模型未返回有效内容，请重试。', {statusCode:502})
+  try { return JSON.parse(text) } catch { throw new GatewayError('INVALID_JSON', 'AI 返回的 JSON 格式异常，请重试。', {statusCode:502}) }
+}
 export const parseReviewResult = (value: string): ReviewResult => normalizeReviewResult(parseJsonOutput(value) as Partial<ReviewResult>)
 export const MAX_REVISIONS = 2
 const worldFields = ['name', 'genre', 'era', 'atmosphere', 'coreRule', 'centralConflict', 'summary'] as const
@@ -35,7 +39,7 @@ const openAIRequest = async ({ messages, model, system, schema, kind, draft, wor
   const schemaName = schema === reviewSchema ? 'npc_creator_review' : schema === npcReplySchema ? 'npc_creator_reply' : 'world_reply'
   const response = await fetch('https://api.openai.com/v1/responses', { method: 'POST', headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ model, store: false, input: [{ role: 'system', content: system }, ...inputMessages], text: { format: { type: 'json_schema', name: schemaName, strict: true, schema } } }) })
   if (!response.ok) throw new Error('OpenAI request failed')
-  const body = await response.json(); return parseJsonOutput(body.output_text || '') as any
+  const body = await response.json(); return parseJsonOutput(readModelText(body)) as any
 }
 /** Backend-only world review loop for the Vercel endpoint. Review data is never returned. */
 export const runReviewedWorldGeneration = async ({ messages, model, request = openAIRequest }: { messages: any[]; model: string; request?: typeof openAIRequest }) => {
@@ -88,7 +92,7 @@ export default async function handler(req: any, res: any) {
     try {
       const provider = body.provider === 'deepseek' ? 'deepseek' : 'openai'
       const key = sessionKey
-      const result = await runNpcRequest({ messages: body.messages, world: body.world, currentWorld: body.currentWorld, currentNpc: body.currentNpc, intent: body.intent || 'create', contentProfile: body.contentProfile, phase: body.phase || 'world', model: body.model || (provider === 'deepseek' ? process.env.DEEPSEEK_MODEL || 'deepseek-chat' : process.env.OPENAI_MODEL || 'gpt-5'), provider, key, requestId: body.requestId })
+      const result = await runNpcRequest({ messages: body.messages, world: body.world, currentWorld: body.currentWorld, currentNpc: body.currentNpc, intent: body.intent || 'create', contentProfile: body.contentProfile, phase: body.phase || 'world', model: body.model || (provider === 'deepseek' ? process.env.DEEPSEEK_MODEL || 'deepseek-chat' : process.env.OPENAI_MODEL || 'gpt-5'), provider, key, requestId: body.requestId,selectedCategoryId:body.selectedCategoryId,designId:body.designId,sourceWorldId:body.sourceWorldId })
       return res.status(200).json(withRequestId(result, typeof body.requestId === 'string' ? body.requestId : undefined))
     } catch (error) {
       const requestId = typeof body.requestId === 'string' ? body.requestId : 'unknown'
@@ -101,10 +105,11 @@ export default async function handler(req: any, res: any) {
   const prompt = action === 'analyze' ? `拆解用户的NPC需求，给出每个字段3个可选项。用户描述：${description}` : `根据用户描述和已选择字段，输出完整NPC JSON。用户描述：${description}；选择：${JSON.stringify(draft)}`
   const response = await fetch('https://api.openai.com/v1/responses', { method: 'POST', headers: { Authorization: `Bearer ${sessionKey}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ model: model || process.env.OPENAI_MODEL || 'gpt-5', input: [{ role: 'system', content: '你是 NPC Creator Agent，只输出合法 JSON，不要解释。' }, { role: 'user', content: prompt }], text: { format: { type: 'json_schema', name: action === 'analyze' ? 'npc_draft' : 'npc_profile', strict: true, schema: action === 'analyze' ? schema : { type: 'object', properties: { id: { type: 'string' }, name: { type: 'string' }, role: { type: 'string' }, world: { type: 'string' }, function: { type: 'string' }, personality: { type: 'array', items: { type: 'string' } }, summary: { type: 'string' }, goal: { type: 'string' }, speechStyle: { type: 'string' }, background: { type: 'string' }, sourcePrompt: { type: 'string' } }, required: ['id', 'name', 'role', 'world', 'function', 'personality', 'summary', 'goal', 'speechStyle', 'background', 'sourcePrompt'], additionalProperties: false } } } }) })
   if (!response.ok) return res.status(502).json({ error: 'OpenAI request failed' })
-  const parsedResponse = await response.json(); try { return res.status(200).json(publicReply(parseJsonOutput(parsedResponse.output_text), action)) } catch (error) { return res.status(502).json({ error: error instanceof Error ? error.message : '模型返回内容不完整，请点击重试。' }) }
+  const parsedResponse = await response.json(); try { return res.status(200).json(publicReply(parseJsonOutput(readModelText(parsedResponse)), action)) } catch (error) { return res.status(502).json(toPublicError(error, body.requestId || 'unknown')) }
 }
 import { runNpcRequest } from '../src/server/npcWorkflow.mjs'
-import { toPublicError } from '../src/server/errors.mjs'
+import { readModelText } from '../src/server/llmGateway.mjs'
+import { GatewayError, toPublicError } from '../src/server/errors.mjs'
 import { withRequestId } from '../src/server/httpResponse.mjs'
 import { normalizeAssetType } from '../src/server/assetType.mjs'
 import { guardVercelRequest } from '../src/server/internalBeta/guard.mjs'
