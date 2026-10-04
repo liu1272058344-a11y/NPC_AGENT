@@ -17,8 +17,8 @@ export async function generateContent(input, dependencies = {}) {
   const category = contentCategories[input.category]
   const context = buildContentContext({world:input.world,item:{id:input.itemId,revision:input.revision,worldId:input.worldId,fields:input.currentDesign?.fields || input.design,visualBrief:input.visualBrief,fieldStatus:input.fieldStatus},overrides:input.overrides})
   const fields = z.object(Object.fromEntries(Object.keys(category.fields).map(key => [key,z.string().optional()]))).strict()
-  const completeSchema = z.object({ assistantMessage:z.string().optional(),suggestions:z.array(z.string()).optional(),category:z.literal(input.category), design:z.object({ name:z.string().min(1), summary:z.string().min(1), fields }).strict(), asset:assetSchema.extend({ negativePrompt:z.string() }) }).strict()
-  const clarificationSchema = z.object({assistantMessage:z.string().optional(),suggestions:z.array(z.string()).optional(),status:z.literal('needs_clarification'),category:z.literal(input.category),question:z.string().min(1),options:z.array(z.string()).optional(),missingFields:z.array(z.string()).optional()}).strict()
+  const completeSchema = z.object({ status:z.literal('complete').optional(),phase:z.literal('content').optional(),assistantMessage:z.string().optional(),suggestions:z.array(z.string()).optional(),category:z.literal(input.category), design:z.object({ name:z.string().min(1), summary:z.string().min(1), fields }).strict(), asset:assetSchema.extend({ negativePrompt:z.string() }) }).strict()
+  const clarificationSchema = z.object({assistantMessage:z.string().optional(),suggestions:z.array(z.string()).optional(),status:z.literal('needs_clarification'),phase:z.literal('content').optional(),category:z.literal(input.category),question:z.string().min(1),options:z.array(z.string()).optional(),missingFields:z.array(z.string()).optional()}).strict()
   const schema = z.union([completeSchema,clarificationSchema])
   const result = await (dependencies.requestStructured || generateStructured)({
     provider:input.provider, model:input.model, key:input.key, signal:input.signal, requestId:input.requestId,

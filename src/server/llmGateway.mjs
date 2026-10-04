@@ -49,10 +49,10 @@ export async function requestStructured({ provider, key, model, messages = [], i
     const timer = setTimeout(() => controller.abort(), timeoutMs)
     const started = Date.now()
     try {
-      const repair = attempt > 0
+      const repair = attempt > 1
       const body = mode === 'responses'
         ? { model, store: false, instructions: `${instructions}${repair ? '\n上一轮返回不是合法 JSON。请修复并只输出完整 JSON。' : ''}`, input: messages, max_output_tokens: 4000, text: { format: { type: 'json_schema', name: 'npc_forge_result', strict: true, schema } } }
-        : { model, messages: [{ role: 'system', content: `${instructions}\n只返回 JSON。${repair ? '\n上一轮返回不是合法 JSON。请修复并只输出完整 JSON。' : ''}` }, ...messages], response_format: { type: 'json_object' }, max_tokens: 4000, stream: false }
+        : { model, messages: [{ role: 'system', content: `${instructions}\n只返回 JSON。${schema ? `\n输出必须符合以下 JSON Schema，包含所有必需字段，不添加 schema 之外的字段：${JSON.stringify(schema)}` : ''}${repair ? '\n上一轮返回不是合法 JSON。请修复并只输出完整 JSON。' : ''}` }, ...messages], response_format: { type: 'json_object' }, max_tokens: 4000, stream: false }
       const response = await fetchImpl(endpoint, { method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: controller.signal })
       const raw = await response.text()
       let payload

@@ -5,6 +5,18 @@ import { requestStructured } from '../src/server/llmGateway.mjs'
 const response = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
 const options = (fetchImpl, extra = {}) => ({ provider: 'deepseek', model: 'deepseek-chat', messages: [{ role: 'user', content: 'hello' }], instructions: 'return json', schema: { type: 'object' }, fetchImpl, sleep: async () => {}, random: () => 0, timeoutMs: 100, ...extra })
 
+test('chat providers receive the output schema without a fictitious first-turn repair', async () => {
+  const schema = {type:'object',properties:{category:{const:'character'}},required:['category'],additionalProperties:false}
+  for (const provider of ['deepseek', 'openai']) {
+    await requestStructured(options(async (_url, init) => {
+      const system = JSON.parse(init.body).messages[0].content
+      assert.ok(system.includes(JSON.stringify(schema)))
+      assert.doesNotMatch(system, /上一轮返回/)
+      return response({choices:[{message:{content:'{"category":"character"}'},finish_reason:'stop'}]})
+    }, {provider, schema}))
+  }
+})
+
 test('parses a completed DeepSeek chat JSON response', async () => {
   const value = await requestStructured(options(async () => response({ choices: [{ message: { content: '{"ok":true}' }, finish_reason: 'stop' }] })))
   assert.deepEqual(value, { ok: true })
