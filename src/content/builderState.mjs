@@ -1,13 +1,17 @@
-import {conversationStorageKey,createConversationSession,restoreConversationSessions,sessionFromArchive,sessionFromLegacyDraft} from './conversationSession.mjs'
+import {createConversationSession,restoreConversationSessions,sessionFromArchive,sessionFromLegacyDraft} from './conversationSession.mjs'
 import {stableLegacyId} from '../agent/assetMigration.mjs'
 import {readCreationSaveStates,readCharacterWorldContext} from '../agent/creationWorkspaceState.mjs'
+import {readDeletedDraftIds,readStoredBuilderSessions} from './draftManagement.mjs'
 const read=(storage,key,fallback=null)=>{try{return JSON.parse(storage.getItem(key) || 'null') || fallback}catch{return fallback}}
 export function readBuilderSessions(storage,idFactory=()=>crypto.randomUUID()){
- const existing=restoreConversationSessions(read(storage,conversationStorageKey,{}))
- for(const draft of Object.values(read(storage,'npc-forge-content-drafts-v1',{}))){if(draft?.id&&!existing[draft.id])existing[draft.id]=sessionFromLegacyDraft(draft)}
+ const existing=restoreConversationSessions(readStoredBuilderSessions(storage))
+ const deleted=readDeletedDraftIds(storage)
+ for(const id of deleted)delete existing[id]
+ for(const draft of Object.values(read(storage,'npc-forge-content-drafts-v1',{}))){if(draft?.id&&!deleted.has(draft.id)&&!existing[draft.id])existing[draft.id]=sessionFromLegacyDraft(draft)}
  for(const [key,kind] of [['npc-forge-current-world','world'],['npc-forge-current-npc','character']]){
   const value=read(storage,key);if(!value)continue
   const id=value.id || stableLegacyId(kind,storage.getItem('npc-forge-workspace-id') || 'default',value)
+  if(deleted.has(id))continue
   if(!value.id)storage.setItem(key,JSON.stringify({...value,id}))
   const state=readCreationSaveStates(storage)[kind==='world'?'world':'character']
   if(!existing[id])existing[id]={...sessionFromArchive({archive:{id,name:value.name || '',summary:value.summary || '',category:kind,profile:{...value,category:kind,...(kind==='character'?{worldId:readCharacterWorldContext(storage).worldId || value.worldId || ''}:{})},imageCount:0},prompts:[],images:[]}),status:state==='saved'?'saved':state==='dirty'?'dirty':'draft'}
