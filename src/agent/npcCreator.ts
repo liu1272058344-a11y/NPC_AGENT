@@ -5,7 +5,7 @@ export interface CreatorReply { status: 'needs_clarification' | 'world_ready' | 
 export interface CreateNPCOptions { phase?: 'world' | 'npc'; world?: WorldProfile; intent?: 'create' | 'revise' | 'regenerate'; currentWorld?: WorldProfile; currentNpc?: NPC; signal?: AbortSignal; requestId?: string }
 export interface CreateAssetOptions { world?: WorldProfile; contentProfile: GameContentProfile; signal?: AbortSignal; requestId?: string }
 
-export interface AgentConfig { endpoint: string; model: string; provider: 'backend' | 'deepseek' | 'openai'; apiKey: string }
+export interface AgentConfig { endpoint: string; model: string; provider: 'backend' | 'deepseek' | 'openai' | 'gemini'; apiKey: string }
 let config: AgentConfig = { endpoint: 'https://api.deepseek.com', model: 'deepseek-chat', provider: 'deepseek', apiKey: '' }
 export const setAgentConfig = (next: Partial<AgentConfig>) => { config = { ...config, ...next } }
 const gatewayEndpoint = () => '/api/npc'

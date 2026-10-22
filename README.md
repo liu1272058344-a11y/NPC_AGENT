@@ -74,3 +74,49 @@ See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rule
 档案详情分设计资料、Prompt 版本和图片。管理档案提供重命名、分类、世界关联、标签和关联内容；旧字段与版本保留稳定 ID。选择历史 Prompt 可以编辑该版本或直接用于生图。
 
 “一键用于文生图”原样带入所选文本。用户可以删改或完全手写，选择模型与尺寸后生成；不自动追加风格或重新分类。图片保存实际请求、参数与来源快照，后续修改输入不会改变上一张图记录。图片可独立保存或明确关联档案，来源删除时不能通过旧交接自动恢复已删档案。
+
+
+## Google Gemini 4 Argon（文本与 NPC 设计）
+
+在本地 `.env.local` 或 Vercel 项目的服务端环境变量中配置：
+
+```dotenv
+GEMINI_API_KEY=你的_Google_AI_Studio_API_Key
+GEMINI_MODEL=gemini-4-argon
+```
+
+重启本地后端或重新部署后，在“API 设置 → 连接模式”选择 **Google Gemini**。
+无需在浏览器填写 Gemini Key；浏览器仅提交 provider、model 和对话内容。
+不要使用 `VITE_GEMINI_API_KEY`，不要提交 `.env.local`。服务端不会采用请求中的 Gemini apiKey/key。
+保留现有 DeepSeek/OpenAI 的默认选择、个人凭据和图片生成方式。
+Gemini 用于游戏内容构建、世界观、NPC 及美术提示词文本生成，不提供图片生成。
+
+适配使用原生 REST：
+`POST https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent`，
+认证头 `x-goog-api-key`。消息转换为 `contents[].parts[].text`，助手角色使用 `model`，
+系统指令使用 `systemInstruction`；JSON Schema 放在 `generationConfig.responseJsonSchema`，
+并指定 `responseMimeType=application/json`。只读取 `candidates[0].content.parts` 中的非 thought 文本，
+保留现有业务字段校验。拒绝安全拦截、截断和异常响应；连接错误与无效 JSON 最多尝试两次，429 不自动重试。
+Gemini 每次调用超时为 60 秒，输出上限 32768 tokens（含 thinking），thinking level 为 MEDIUM。
+如任务触及上限，返回错误，不把不完整结果保存为成功。
+
+官方也支持 `streamGenerateContent`（SSE）；本次沿用项目非流式 JSON 契约，等完整响应后再校验。
+所用模型和配额必须对当前 Google 项目可用；缺失 Key 时返回配置错误。
+
+验证（在项目根目录执行）：
+
+```powershell
+node --test tests/*.test.mjs
+npm run build
+node --env-file=.env.local scripts/smoke-gemini.mjs
+```
+
+前两项无需调用真实模型。最后一项会发送一次真实请求并产生 Google API 费用，
+只输出通过/失败及安全错误码，不打印 Key 或生成内容。需 Node 24，网络能访问 Google API，
+且 Gemini Key 对目标模型有权限。线上还应登录内测页面，选择 Gemini，创建一个世界观，
+确认返回结果可编辑与保存；错误时原有输入应保留。
+
+官方资料（2026-10-22 核对）：
+[模型说明](https://ai.google.dev/gemini-api/docs/models/gemini-4-argon)、
+[REST 请求/响应与流式接口](https://ai.google.dev/api/generate-content)、
+[结构化输出](https://ai.google.dev/gemini-api/docs/structured-output)。

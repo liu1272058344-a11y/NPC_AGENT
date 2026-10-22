@@ -2,12 +2,18 @@ import { GatewayError } from './errors.mjs'
 
 const retryableStatus = new Set([429, 500, 502, 503, 504])
 const endpointFor = (provider, model, mode) => {
+  if (provider === 'gemini') return `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`
   if (provider === 'deepseek') return mode === 'responses' ? 'https://api.deepseek.com/responses' : 'https://api.deepseek.com/chat/completions'
   if (provider === 'openai') return mode === 'responses' ? 'https://api.openai.com/v1/responses' : 'https://api.openai.com/v1/chat/completions'
   throw new GatewayError('CONFIGURATION_ERROR', `Unsupported provider: ${provider}`, { statusCode: 400 })
 }
-const modeFor = (provider, model) => provider === 'deepseek' && /^(deepseek-flash|deepseek-v4-pro)$/.test(model) ? 'responses' : 'chat'
+const modeFor = (provider, model) => provider === 'gemini' ? 'gemini' : provider === 'deepseek' && /^(deepseek-flash|deepseek-v4-pro)$/.test(model) ? 'responses' : 'chat'
 export const readModelText = (body, mode = 'responses') => {
+  if (mode === 'gemini') {
+    const parts = body?.candidates?.[0]?.content?.parts
+    if (!Array.isArray(parts) || parts.some(part => !part || (part.text !== undefined && typeof part.text !== 'string') || (!part.thought && typeof part.text !== 'string'))) throw new GatewayError('INVALID_MODEL_RESPONSE', '模型服务返回的数据结构异常，请重试。', {statusCode:502})
+    return parts.filter(part => !part.thought).map(part => part.text).join('')
+  }
   const invalid = () => new GatewayError('INVALID_MODEL_RESPONSE', '模型服务返回的数据结构异常，请重试。', { statusCode: 502 })
   if (!body || typeof body !== 'object' || (body.output !== undefined && !Array.isArray(body.output))) throw invalid()
   if (body.output?.some(item => !item || (item.content !== undefined && !Array.isArray(item.content)))) throw invalid()
@@ -63,6 +69,14 @@ const providerError = (response, payload) => {
   return new GatewayError('API_ERROR', '模型 API 请求失败，请检查服务配置或稍后重试。', { retryable: status >= 500, statusCode: status >= 400 && status < 500 ? 400 : 502, providerPayload: payload })
 }
 const inspectCompletion = (body, mode) => {
+  if (mode === 'gemini') {
+    if (body.promptFeedback?.blockReason) throw new GatewayError('MODEL_REFUSAL', '模型无法处理此生成请求，请调整描述。', {statusCode:422})
+    if (!Array.isArray(body.candidates) || !body.candidates[0]) throw new GatewayError('INVALID_MODEL_RESPONSE', '模型服务返回的数据结构异常，请重试。', {statusCode:502})
+    const reason = body.candidates[0].finishReason
+    if (['SAFETY','RECITATION','BLOCKLIST','PROHIBITED_CONTENT','SPII'].includes(reason)) throw new GatewayError('MODEL_REFUSAL', '模型无法处理此生成请求，请调整描述。', {statusCode:422})
+    if (reason !== 'STOP') throw new GatewayError('API_ERROR', '模型输出被截断或未完成，请重试。', {statusCode:502})
+    return
+  }
   if (mode === 'responses') {
     if (body.status === 'incomplete') {
       const reason = body.incomplete_details?.reason
@@ -77,7 +91,7 @@ const inspectCompletion = (body, mode) => {
   }
 }
 
-export async function requestStructured({ provider, key, model, messages = [], instructions = '', schema, validate, signal, requestId = 'unknown', fetchImpl = fetch, sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)), random = Math.random, timeoutMs = 15000, logger = (entry) => console.debug('[AI_GENERATION_MODEL]', entry) }) {
+export async function requestStructured({ provider, key, model, messages = [], instructions = '', schema, validate, signal, requestId = 'unknown', fetchImpl = fetch, sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)), random = Math.random, timeoutMs = provider === 'gemini' ? 60000 : 15000, logger = (entry) => console.debug('[AI_GENERATION_MODEL]', entry) }) {
   const mode = modeFor(provider, model)
   const endpoint = endpointFor(provider, model, mode)
   if (signal?.aborted) throw new GatewayError('REQUEST_ABORTED', '请求已取消。', { statusCode: 499 })
@@ -95,10 +109,12 @@ export async function requestStructured({ provider, key, model, messages = [], i
     const metadata = { requestId, provider, model, attempt, startedAt:new Date(started).toISOString() }
     try {
       const repair = ['EMPTY_RESPONSE','INVALID_JSON','INVALID_SCHEMA'].includes(lastError?.code)
-      const body = mode === 'responses'
+      const body = mode === 'gemini'
+        ? {contents:messages.filter(message => message.role !== 'system').map(message => ({role:message.role === 'assistant' ? 'model' : 'user',parts:[{text:message.content}]})),systemInstruction:{parts:[{text:[instructions,...messages.filter(message => message.role === 'system').map(message => message.content), repair ? '上一轮返回未通过 JSON 或字段校验。请修复并只输出完整 JSON。' : '只返回完整 JSON。'].join('\n')}]},generationConfig:{responseMimeType:'application/json',...(schema ? {responseJsonSchema:schema} : {}),maxOutputTokens:32768,thinkingConfig:{thinkingLevel:'MEDIUM'}}}
+        : mode === 'responses'
         ? { model, store: false, instructions: `${instructions}${wrapped ? '\n输出包装为 {"result":符合内容 schema 的对象}。' : ''}${repair ? '\n上一轮返回未通过 JSON 或字段校验。请修复并只输出完整 JSON。' : ''}`, input: messages, max_output_tokens: 4000, text: { format: { type: 'json_schema', name: 'npc_forge_result', strict: true, schema:outputSchema } } }
         : { model, messages: [{ role: 'system', content: `${instructions}\n只返回 JSON。${schema ? `\n输出必须符合以下 JSON Schema，包含所有必需字段，不添加 schema 之外的字段：${JSON.stringify(provider === 'openai' && strict ? outputSchema : schema)}` : ''}${repair ? '\n上一轮返回未通过 JSON 或字段校验。请修复并只输出完整 JSON。' : ''}` }, ...messages], response_format: provider === 'openai' && strict ? { type:'json_schema', json_schema:{name:'npc_forge_result',strict:true,schema:outputSchema} } : { type: 'json_object' }, ...(provider === 'openai' ? {max_completion_tokens:4000} : {max_tokens:4000}), stream: false }
-      const response = await fetchImpl(endpoint, { method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: controller.signal })
+      const response = await fetchImpl(endpoint, { method: 'POST', headers: { ...(provider === 'gemini' ? {'x-goog-api-key':key} : {Authorization:`Bearer ${key}`}), 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: controller.signal })
       const raw = await response.text()
       metadata.httpStatus = response.status; metadata.hasRawResponse = Boolean(raw)
       let payload

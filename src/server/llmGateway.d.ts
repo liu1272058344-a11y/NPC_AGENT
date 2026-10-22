@@ -1,5 +1,5 @@
 export interface GatewayRequest {
-  provider: 'deepseek' | 'openai'
+  provider: 'deepseek' | 'openai' | 'gemini'
   key: string
   model: string
   messages?: Array<{ role: string; content: string }>
@@ -11,4 +11,4 @@ export interface GatewayRequest {
   logger?: (entry: Record<string, unknown>) => void
 }
 export declare const requestStructured: (options: GatewayRequest) => Promise<unknown>
-export declare const readModelText: (body: any, mode?: 'responses' | 'chat') => string | undefined
+export declare const readModelText: (body: any, mode?: 'responses' | 'chat' | 'gemini') => string | undefined

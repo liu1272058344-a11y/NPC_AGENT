@@ -1,3 +1,4 @@
+import { geminiConfig } from '../src/server/geminiConfig.mjs'
 import { sessionCredential, requireSameOrigin } from '../src/server/credentialSession.mjs'
 const schema = { type: 'object', properties: { worldOptions: { type: 'array', items: { type: 'string' } }, roleOptions: { type: 'array', items: { type: 'string' } }, functionOptions: { type: 'array', items: { type: 'string' } }, personalityOptions: { type: 'array', items: { type: 'string' } } }, required: ['worldOptions', 'roleOptions', 'functionOptions', 'personalityOptions'], additionalProperties: false }
 export interface ReviewResult { approved: boolean; issues: string[]; suggestions: string[]; score?: number }
@@ -80,19 +81,21 @@ const publicReply = (value: unknown, action: unknown) => {
   if (!npc.name) throw new Error('模型没有返回有效 NPC。')
   return { status: 'complete', phase: 'npc', npc }
 }
+export const maxDuration = 60
+
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' })
   if (!await guardVercelRequest(req, res, { costKind: 'npc' })) return
   res.setHeader('Cache-Control', 'no-store')
   const body = req.body || {}
   let sessionKey: string
-  try { requireSameOrigin(req); sessionKey = sessionCredential(req, body.provider === 'deepseek' ? 'deepseek' : 'openai') }
-  catch (error: any) { return res.status(error.statusCode || 401).json({ message: error.message }) }
+  try { requireSameOrigin(req); if (body.provider === 'gemini' && !Array.isArray(body.messages)) throw new GatewayError('INVALID_REQUEST', 'Gemini 请求需要 messages 对话。', {statusCode:400}); sessionKey = body.provider === 'gemini' ? geminiConfig(body.model).key : sessionCredential(req, body.provider === 'deepseek' ? 'deepseek' : 'openai') }
+  catch (error: any) { return res.status(error.statusCode || 401).json(error instanceof GatewayError ? toPublicError(error, body.requestId || 'unknown') : { message: error.message }) }
   if (Array.isArray(body.messages)) {
     try {
-      const provider = body.provider === 'deepseek' ? 'deepseek' : 'openai'
+      const provider = body.provider === 'gemini' ? 'gemini' : body.provider === 'deepseek' ? 'deepseek' : 'openai'
       const key = sessionKey
-      const result = await runNpcRequest({ messages: body.messages, world: body.world, currentWorld: body.currentWorld, currentNpc: body.currentNpc, intent: body.intent || 'create', contentProfile: body.contentProfile, phase: body.phase || 'world', model: body.model || (provider === 'deepseek' ? process.env.DEEPSEEK_MODEL || 'deepseek-chat' : process.env.OPENAI_MODEL || 'gpt-5'), provider, key, requestId: body.requestId,selectedCategoryId:body.selectedCategoryId,designId:body.designId,sourceWorldId:body.sourceWorldId })
+      const result = await runNpcRequest({ messages: body.messages, world: body.world, currentWorld: body.currentWorld, currentNpc: body.currentNpc, intent: body.intent || 'create', contentProfile: body.contentProfile, phase: body.phase || 'world', model: provider === 'gemini' ? geminiConfig(body.model).model : body.model || (provider === 'deepseek' ? process.env.DEEPSEEK_MODEL || 'deepseek-chat' : process.env.OPENAI_MODEL || 'gpt-5'), provider, key, requestId: body.requestId,selectedCategoryId:body.selectedCategoryId,designId:body.designId,sourceWorldId:body.sourceWorldId })
       return res.status(200).json(withRequestId(result, typeof body.requestId === 'string' ? body.requestId : undefined))
     } catch (error) {
       const requestId = typeof body.requestId === 'string' ? body.requestId : 'unknown'
